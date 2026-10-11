@@ -58,7 +58,14 @@ The core contains no market- or instrument-specific logic. It is a generic harne
 1. A **strategy config** (JSON) names a Java **strategy class** and lists **rules**. Each rule is a reusable core rule type plus parameters.
 2. The engine validates the config, builds the rules, and triggers the strategy class with the **raw data**.
 3. Each strategy defines **its own data format**. The strategy class reads the data, evaluates its rules against facts it derives, and **computes its own metrics**.
-4. Results are stored with the exact config version used, so runs can be reproduced and compared.
+4. Results are stored with the exact config version used and a **manifest** (engine build, strategy hash, data hashes, execution assumptions), so runs can be reproduced and compared.
+
+The code is split into two Maven modules:
+
+| Module | Contents |
+|---|---|
+| `tradeevo-core` | Plain Java library with no Spring: rules, strategy contract, engine, data loading, JSON file stores, run comparison. Use it without Spring via `StrategyEngine.create(List.of(new MyStrategy()))`. |
+| `tradeevo-app` | Spring Boot REST API and CLI around the core, plus the strategy implementations (`com.tradeevo.strategies.*`). |
 
 Design spec: [`docs/superpowers/specs/2026-10-10-tradeevo-core-design.md`](docs/superpowers/specs/2026-10-10-tradeevo-core-design.md)
 
@@ -89,7 +96,7 @@ Design spec: [`docs/superpowers/specs/2026-10-10-tradeevo-core-design.md`](docs/
 | `strategyClass` | Fully qualified name of a `Strategy` class in this project |
 | `dataset` | Data folder under the data dir (default: `id`) |
 | `settings` | Free-form, strategy-specific settings |
-| `rules[]` | `name` (unique), `rule` (core rule type), `params`, optional `action` (interpreted by the strategy) |
+| `rules[]` | `name` (unique), `rule` (core rule type), `params`, optional `action` (interpreted by the strategy), optional `onUnknown` |
 
 Unknown fields are rejected, so typos can't slip through.
 
@@ -104,28 +111,58 @@ Unknown fields are rejected, so typos can't slip through.
 | `All` / `Any` | `rules[]` of `{rule, params}` | all / any nested rules match |
 | `Not` | `rule` | the nested rule does not match |
 
-A missing fact, or one whose type doesn't fit, never matches. `GET /api/rules` returns every rule's parameter schema.
+`GET /api/rules` returns every rule's parameter schema.
+
+#### Missing data: three-valued rules
+
+Rules evaluate to `TRUE`, `FALSE` or `UNKNOWN`. A fact that is missing, null, of an incompatible type or unparseable gives `UNKNOWN`. It is never silently `FALSE`, so `Not(rsi > 55)` with no RSI is still `UNKNOWN`, not a match.
+
+| | `All` | `Any` | `Not` |
+|---|---|---|---|
+| result | FALSE if any is FALSE, else UNKNOWN if any is UNKNOWN, else TRUE | TRUE if any is TRUE, else UNKNOWN if any is UNKNOWN, else FALSE | UNKNOWN stays UNKNOWN |
+
+Each top-level rule's `onUnknown` decides what an `UNKNOWN` outcome means for the strategy:
+- `NO_MATCH` (default): treated as not matching.
+- `MATCH`: treated as matching.
+- `FAIL`: fails the run, naming the rule and its missing facts.
+
+Every run records `ruleStats` (`matched` / `notMatched` / `unknown` per rule), with a warning for each rule that was ever UNKNOWN.
 
 ### Data
 
 A backtest reads `{data-dir}/{dataset}/{yyyy-MM-dd}.json` for each date in the range. Dates without a file are skipped. An evaluation takes the same JSON in the request body instead. TradeEvo never interprets the contents; only the strategy class does.
 
+Strategies should run record timestamps through `core.data.TimeOrder`, as the example does. Times must strictly increase across the whole run, including across file boundaries. Out-of-order, duplicate, missing or unparseable times fail the run with the record's location. Data is never reordered silently.
+
+### Reproducibility and comparison
+
+Each run record contains a `manifest`:
+
+| Field | Meaning |
+|---|---|
+| `engineVersion`, `engineCommit`, `engineDirty` | Build that ran it (Maven version, git commit, whether there were uncommitted changes) |
+| `strategyHash` | SHA-256 of the behavior-relevant config (`strategyClass`, `dataset`, `settings`, `rules`; not id, version or description) |
+| `dataFiles[]`, `dataHash` | SHA-256 of each input file's canonical JSON, and of the whole list. Editing a data file changes the hash |
+| `assumptions` | Execution assumptions declared by the strategy |
+
+`GET /api/backtests/compare` checks runs against the first one (dataset, period, `dataHash`, engine build, assumptions, status, manifest present). It returns `comparable` and a list of `issues`; with `strict=true` it returns 409 when they aren't comparable. Compare strategy versions only when `comparable` is true.
+
 ### Adding a strategy
 
-1. Create a `@Component` that implements `com.tradeevo.core.strategy.Strategy` under `com.tradeevo.strategies.<name>`.
+1. Create a `@Component` that implements `com.tradeevo.core.strategy.Strategy` under `com.tradeevo.strategies.<name>` in `tradeevo-app`.
 2. Define its data format, read `context.data()`, build `Facts` per record, and use `context.rules()` (`matches`, `matching`, `anyMatches`).
-3. Return a `StrategyResult` with numeric `metrics`, plus any `details` you want stored.
+3. Return a `StrategyResult` with numeric `metrics`, any `details` you want stored, and `assumptions` describing how the metrics were produced. A strategy that reports trading results must model execution, sizing, costs and slippage and declare them there. The example strategy is signal-only (`valueChange*` metrics are raw changes in a value, not P&L).
 4. Optionally override `validate(config)` for required rules, actions or settings.
 
-Then reference the class in a config. The engine needs no changes. See `strategies/example/ThresholdSignalStrategy` for a complete example.
+Then reference the class in a config. The engine needs no changes. See `tradeevo-app/.../strategies/example/ThresholdSignalStrategy` for a complete example.
 
 ## Build & run
 
 Requires JDK 25. Maven is provided by the wrapper.
 
 ```bash
-./mvnw verify                      # build + tests  (Windows: mvnw.cmd verify)
-java -jar target/tradeevo.jar      # REST server on :8080
+./mvnw verify                                # build + tests of both modules  (Windows: mvnw.cmd verify)
+java -jar tradeevo-app/target/tradeevo.jar   # REST server on :8080
 ```
 
 Configuration (`application.yml`, or `--tradeevo.data-dir=...` on the command line):
@@ -147,7 +184,7 @@ Configuration (`application.yml`, or `--tradeevo.data-dir=...` on the command li
 | `GET /api/strategies/{id}/versions[/{v}]` | Version numbers / one version |
 | `POST /api/backtests` | Run `{strategyId, version?, startDate, endDate}` over data files; result is stored |
 | `GET /api/backtests[?strategyId=]`, `GET /api/backtests/{runId}` | Stored runs |
-| `GET /api/backtests/compare?runIds=a,b` | Metrics side by side |
+| `GET /api/backtests/compare?runIds=a,b[&strict=true]` | Metrics side by side, plus `comparable` and `issues`; with `strict`, 409 if not comparable |
 | `POST /api/evaluations` | Real-time: `{strategy, data}` → result, not stored |
 
 `strategy` in an evaluation is either `{"strategyId": "...", "version": 2}` (version optional) or an inline config with `strategyClass`.
@@ -163,9 +200,9 @@ curl -X POST localhost:8080/api/backtests  -H 'Content-Type: application/json' \
 ## Command line
 
 ```bash
-java -jar target/tradeevo.jar backtest --config examples/threshold-signal.json \
+java -jar tradeevo-app/target/tradeevo.jar backtest --config examples/threshold-signal.json \
      --from 2024-01-01 --to 2024-01-31 --data-dir examples/data
-java -jar target/tradeevo.jar backtest --strategy-id threshold-signal [--strategy-version 2] \
+java -jar tradeevo-app/target/tradeevo.jar backtest --strategy-id threshold-signal [--strategy-version 2] \
      --from 2024-01-01 --to 2024-01-31
 ```
 

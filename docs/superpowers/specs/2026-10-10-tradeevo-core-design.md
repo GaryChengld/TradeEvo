@@ -111,3 +111,14 @@ Adding a strategy: create a `@Component` class implementing `Strategy` under `co
 2. Manual end to end with `examples/`:
    - `mvn spring-boot:run`, then `curl` GET `/api/rules`, POST the example config, POST `/api/backtests` with a date range, POST `/api/evaluations` with inline data.
    - `java -jar target/tradeevo.jar backtest --config examples/threshold-signal.json --from … --to … --data-dir examples/data` prints metrics and writes the result JSON.
+
+## Revisions (2026-10-11): fixes from code review
+
+- **Modules:** `tradeevo-core` is a plain Java library with no Spring dependency (rules, strategy contract, engine, data, stores, comparison; `CoreRuleTypes.builtIns()`, `StrategyEngine.create(...)`). `tradeevo-app` holds the Spring REST API, CLI and strategies, and wires the core in `CoreConfiguration`. `CoreHasNoSpringTest` guards the boundary.
+- **Atomic writes:** `JsonFiles.writeNew` writes and syncs a temp file, then publishes it with a hard link (atomic, create-only), falling back to a non-replacing move. A failure never leaves a partial version or result.
+- **Reproducibility:** `RunRecord.manifest` holds the engine version, git commit and dirty flag, `strategyHash` (behavior-relevant config only), per-file canonical-JSON SHA-256s, `dataHash`, and the strategy's `assumptions`. Hashes are taken before the strategy runs.
+- **Three-valued rules:** `Truth {TRUE, FALSE, UNKNOWN}` with Kleene All/Any/Not. A missing or incompatible fact is UNKNOWN. Per-rule `onUnknown`: NO_MATCH (default), MATCH or FAIL. `RunRecord.ruleStats` counts outcomes, with a warning for each rule that was UNKNOWN.
+- **Time order:** the `core.data.TimeOrder` utility rejects missing, unparseable, mixed local/offset, duplicate or decreasing times, across file boundaries. The example strategy requires it, so bad data fails the run.
+- **Immutability:** JSON nodes in `StrategyConfig`, `RuleConfig`, `StrategyResult`, `RunRecord` and `RunManifest` are deep-copied on construction and on access.
+- **Signals vs P&L:** `StrategyResult.assumptions` declares the execution model. The example strategy is labeled signal-only and its metrics were renamed (`valueChangeTotal`, `valueChangeAverage`, `positiveSignalRate`).
+- **Comparable comparisons:** `RunComparator` flags differences in dataset, period, `dataHash`, engine build, assumptions, status or a missing manifest. `compare` returns `comparable` and `issues`; `strict=true` turns a non-comparable result into 409.
