@@ -7,7 +7,6 @@ import java.io.IOException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.time.LocalDate;
-import java.util.List;
 
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -31,22 +30,34 @@ class DataRepositoryTest {
         Path dataset = Files.createDirectories(dataDir.resolve("ds"));
         Files.writeString(dataset.resolve("2024-01-02.json"), "{\"day\": 2}");
         Files.writeString(dataset.resolve("2024-01-04.json"), "{\"day\": 4}");
+        Files.writeString(dataset.resolve("2024-01-06.json"), "{\"session\": \"closed\", \"reason\": \"weekend\"}");
+        Files.writeString(dataset.resolve("2024-01-07.json"), "{\"session\": \"open\", \"day\": 7}");
         Files.writeString(dataset.resolve("2024-02-01.json"), "{not json");
         Files.writeString(dataset.resolve("2024-03-01.json"), "");
     }
 
     @Test
-    void loadsFilesInRangeInDateOrderSkippingMissingDates() {
-        List<DataFile> files = repository.load("ds", LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 10));
+    void loadsSessionFilesInDateOrderAndRecordsClosedAndMissingDates() {
+        DataSet data = repository.load("ds", LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 8));
 
-        assertThat(files).extracting(DataFile::date).containsExactly(LocalDate.of(2024, 1, 2), LocalDate.of(2024, 1, 4));
-        assertThat(files.get(1).content().get("day").intValue()).isEqualTo(4);
+        assertThat(data.files()).extracting(DataFile::date)
+                .containsExactly(LocalDate.of(2024, 1, 2), LocalDate.of(2024, 1, 4), LocalDate.of(2024, 1, 7));
+        assertThat(data.files().get(1).content().get("day").intValue()).isEqualTo(4);
+        assertThat(data.coverage().closedDates()).containsExactly(LocalDate.of(2024, 1, 6));
+        assertThat(data.coverage().missingDates()).containsExactly(LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 3),
+                LocalDate.of(2024, 1, 5), LocalDate.of(2024, 1, 8));
+    }
+
+    @Test
+    void aRangeWithOnlyClosedDaysHasNoSessionData() {
+        assertThatThrownBy(() -> repository.load("ds", LocalDate.of(2024, 1, 6), LocalDate.of(2024, 1, 6)))
+                .isInstanceOf(NotFoundException.class).hasMessageContaining("(1 closed, 0 without a file");
     }
 
     @Test
     void noFilesInRangeIsNotFound() {
         assertThatThrownBy(() -> repository.load("ds", LocalDate.of(2023, 1, 1), LocalDate.of(2023, 1, 31)))
-                .isInstanceOf(NotFoundException.class).hasMessageContaining("No data files for dataset 'ds'");
+                .isInstanceOf(NotFoundException.class).hasMessageContaining("No session data for dataset 'ds'");
         assertThatThrownBy(() -> repository.load("other", LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 31)))
                 .isInstanceOf(NotFoundException.class);
     }

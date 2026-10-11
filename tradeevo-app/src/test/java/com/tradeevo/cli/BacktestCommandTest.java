@@ -68,7 +68,8 @@ class BacktestCommandTest {
                 "--data-dir", AppTestSupport.EXAMPLE_DATA_DIR.toString(), "--out", out.toString());
 
         assertThat(exit).as(stderr.toString()).isZero();
-        assertThat(stdout.toString()).contains("COMPLETED", "threshold-signal", "3 file(s)", "signals");
+        assertThat(stdout.toString()).contains("COMPLETED", "threshold-signal", "3 file(s), 3 closed, 25 missing",
+                "signals", "Warning   25 date(s) have no data file");
         List<Path> results = list(out);
         assertThat(results).hasSize(1);
         JsonNode result = mapper.readTree(results.getFirst().toFile());
@@ -96,7 +97,7 @@ class BacktestCommandTest {
 
         assertThat(execute("--config", AppTestSupport.EXAMPLE_CONFIG.toString(), "--from", "2030-01-01", "--to", "2030-01-02",
                 "--out", out.toString())).isEqualTo(2);
-        assertThat(stderr.toString()).contains("No data files");
+        assertThat(stderr.toString()).contains("No session data");
 
         assertThat(execute("--from", "2024-01-01", "--to", "2024-01-31")).as("missing strategy source").isEqualTo(2);
     }

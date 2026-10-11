@@ -131,7 +131,11 @@ public class BacktestCommand implements Callable<Integer> {
         out.printf("Run       %s  %s%n", record.runId(), record.status());
         out.printf("Strategy  %s%s (%s)%n", strategy.id(),
                 strategy.version() != null ? " v" + strategy.version() : "", strategy.strategyClass());
-        out.printf("Data      %d file(s), %s to %s%n", record.dataDates().size(), record.startDate(), record.endDate());
+        out.printf("Data      %d file(s)%s, %s to %s%n", record.dataDates().size(),
+                record.manifest() == null ? ""
+                        : ", " + record.manifest().closedDates().size() + " closed, "
+                                + record.manifest().missingDates().size() + " missing",
+                record.startDate(), record.endDate());
         if (record.manifest() != null) {
             out.printf("Engine    %s (%s%s)%n", record.manifest().engineVersion(), record.manifest().engineCommit(),
                     record.manifest().engineDirty() ? ", uncommitted changes" : "");

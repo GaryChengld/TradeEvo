@@ -20,6 +20,11 @@ import com.tradeevo.core.error.NotFoundException;
 /**
  * Reads raw data files laid out as {@code {dataDir}/{dataset}/{yyyy-MM-dd}.json}. Contents are
  * returned as raw JSON; only the strategy knows their format.
+ *
+ * <p>Coverage convention: a data provider can write a file for every calendar day, marking
+ * non-trading days with {@code {"session": "closed"}} (other fields, such as a reason, are allowed).
+ * Closed days are skipped and recorded as closed. Days with no file are skipped too, but recorded as
+ * missing, because an unmarked gap may be an accidentally missing trading day.
  */
 public class DataRepository {
 
@@ -38,14 +43,18 @@ public class DataRepository {
         return dataDir;
     }
 
+    /** The JSON field and value that mark a day without a trading session. */
+    public static final String SESSION_FIELD = "session";
+    public static final String CLOSED = "closed";
+
     /**
-     * Loads the files for every date in {@code [from, to]}, in date order. Dates without a file are
-     * skipped.
+     * Loads the session files for every date in {@code [from, to]}, in date order, and records which
+     * dates were closed or had no file.
      *
-     * @throws NotFoundException if no file exists in the range
+     * @throws NotFoundException if the range has no session file
      * @throws InvalidDataException if a file is not valid JSON
      */
-    public List<DataFile> load(String dataset, LocalDate from, LocalDate to) {
+    public DataSet load(String dataset, LocalDate from, LocalDate to) {
         if (!Identifiers.isValid(dataset)) {
             throw new BadRequestException("dataset '" + dataset + "' is invalid: " + Identifiers.RULE);
         }
@@ -60,17 +69,33 @@ public class DataRepository {
         }
         Path directory = dataDir.resolve(dataset);
         List<DataFile> files = new ArrayList<>();
+        List<LocalDate> closed = new ArrayList<>();
+        List<LocalDate> missing = new ArrayList<>();
         for (LocalDate date = from; !date.isAfter(to); date = date.plusDays(1)) {
             Path file = directory.resolve(date + ".json");
-            if (Files.isRegularFile(file)) {
-                files.add(new DataFile(date, read(file)));
+            if (!Files.isRegularFile(file)) {
+                missing.add(date);
+                continue;
+            }
+            JsonNode content = read(file);
+            if (isClosedMarker(content)) {
+                closed.add(date);
+            } else {
+                files.add(new DataFile(date, content));
             }
         }
         if (files.isEmpty()) {
-            throw new NotFoundException("No data files for dataset '" + dataset + "' from " + from + " to " + to
-                    + " (expected " + directory.resolve("yyyy-MM-dd.json") + ")");
+            throw new NotFoundException("No session data for dataset '" + dataset + "' from " + from + " to " + to
+                    + " (" + closed.size() + " closed, " + missing.size() + " without a file; expected "
+                    + directory.resolve("yyyy-MM-dd.json") + ")");
         }
-        return files;
+        return new DataSet(files, new DataCoverage(closed, missing));
+    }
+
+    /** Whether the content is a closed-day marker: an object with {@code "session": "closed"}. */
+    public static boolean isClosedMarker(JsonNode content) {
+        JsonNode session = content.get(SESSION_FIELD);
+        return content.isObject() && session != null && session.isTextual() && CLOSED.equals(session.textValue());
     }
 
     private JsonNode read(Path file) {

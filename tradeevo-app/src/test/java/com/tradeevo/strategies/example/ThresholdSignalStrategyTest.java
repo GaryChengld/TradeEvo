@@ -25,7 +25,7 @@ class ThresholdSignalStrategyTest {
 
     private List<DataFile> exampleData() {
         return new DataRepository(AppTestSupport.EXAMPLE_DATA_DIR, AppTestSupport.MAPPER)
-                .load("example", LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 31));
+                .load("example", LocalDate.of(2024, 1, 1), LocalDate.of(2024, 1, 31)).files();
     }
 
     private RunRecord evaluate(String data) {

@@ -1,5 +1,7 @@
 package com.tradeevo.core.rule;
 
+import java.math.BigDecimal;
+import java.math.BigInteger;
 import java.time.LocalDateTime;
 import java.time.LocalTime;
 import java.time.OffsetDateTime;
@@ -45,8 +47,9 @@ public final class Values {
     }
 
     /**
-     * Compares two values of compatible types: numbers numerically, otherwise values of the same
-     * {@link Comparable} type. Returns empty when the values cannot be compared.
+     * Compares two values of compatible types: numbers by exact decimal value, otherwise values of the
+     * same {@link Comparable} type. Returns empty when the values cannot be compared, including when
+     * either number is NaN or infinite.
      */
     @SuppressWarnings({"unchecked", "rawtypes"})
     public static Optional<Integer> compare(Object left, Object right) {
@@ -54,12 +57,42 @@ public final class Values {
             return Optional.empty();
         }
         if (left instanceof Number l && right instanceof Number r) {
-            return Optional.of(Double.compare(l.doubleValue(), r.doubleValue()));
+            BigDecimal a = toDecimal(l);
+            BigDecimal b = toDecimal(r);
+            return a == null || b == null ? Optional.empty() : Optional.of(a.compareTo(b));
         }
         if (left.getClass() == right.getClass() && left instanceof Comparable comparable) {
             return Optional.of(Integer.signum(comparable.compareTo(right)));
         }
         return Optional.empty();
+    }
+
+    /**
+     * The exact decimal value of a number, or null if it is NaN, infinite or not numeric. Integral
+     * types and {@link BigDecimal}/{@link BigInteger} keep full precision; doubles and floats use their
+     * shortest decimal representation (so {@code 0.1d} equals {@code new BigDecimal("0.1")}).
+     */
+    public static BigDecimal toDecimal(Number number) {
+        if (number instanceof BigDecimal decimal) {
+            return decimal;
+        }
+        if (number instanceof BigInteger integer) {
+            return new BigDecimal(integer);
+        }
+        if (number instanceof Long || number instanceof Integer || number instanceof Short || number instanceof Byte) {
+            return BigDecimal.valueOf(number.longValue());
+        }
+        if (number instanceof Float f) {
+            return Float.isFinite(f) ? new BigDecimal(Float.toString(f)) : null;
+        }
+        if (number instanceof Double d) {
+            return Double.isFinite(d) ? BigDecimal.valueOf(d) : null;
+        }
+        try {
+            return new BigDecimal(number.toString());
+        } catch (NumberFormatException e) {
+            return null;
+        }
     }
 
     /** Equality that treats numbers of different Java types (e.g. 1 and 1.0) as equal. */
@@ -68,8 +101,8 @@ public final class Values {
     }
 
     /**
-     * Tests {@code left <operator> right}. A missing value or incompatible types give
-     * {@link Truth#UNKNOWN}, for every operator including {@code !=}.
+     * Tests {@code left <operator> right}. A missing value, NaN or infinity, or incompatible types
+     * give {@link Truth#UNKNOWN}, for every operator including {@code !=}.
      */
     public static Truth test(Object left, String operator, Object right) {
         Optional<Integer> comparison = compare(left, right);

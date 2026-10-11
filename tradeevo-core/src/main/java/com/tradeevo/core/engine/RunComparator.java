@@ -38,6 +38,7 @@ public final class RunComparator {
             check(issues, baseline, run, "endDate", r -> r.endDate());
             if (baseline.manifest() != null && run.manifest() != null) {
                 check(issues, baseline, run, "dataset", r -> r.manifest().dataset());
+                check(issues, baseline, run, "missingDates", r -> r.manifest().missingDates());
                 check(issues, baseline, run, "dataHash", r -> r.manifest().dataHash());
                 check(issues, baseline, run, "engineVersion", r -> r.manifest().engineVersion());
                 check(issues, baseline, run, "engineCommit", r -> r.manifest().engineCommit());

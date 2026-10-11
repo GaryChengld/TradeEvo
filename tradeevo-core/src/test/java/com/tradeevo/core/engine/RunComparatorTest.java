@@ -21,7 +21,13 @@ class RunComparatorTest {
 
     private static RunRecord run(String id, int version, LocalDate end, String dataHash, String commit,
             JsonNode assumptions, RunStatus status, Map<String, Number> metrics) {
-        RunManifest manifest = new RunManifest("1.0", commit, false, "c", "sh" + version, "ds", dataHash, List.of(), assumptions);
+        return run(id, version, end, dataHash, commit, assumptions, status, metrics, List.of());
+    }
+
+    private static RunRecord run(String id, int version, LocalDate end, String dataHash, String commit,
+            JsonNode assumptions, RunStatus status, Map<String, Number> metrics, List<LocalDate> missing) {
+        RunManifest manifest = new RunManifest("1.0", commit, false, "c", "sh" + version, "ds", dataHash, List.of(),
+                List.of(), missing, assumptions);
         return new RunRecord(id, status, RunMode.BACKTEST, new StrategyConfig("s", version, null, "c", null, null, List.of()),
                 JAN_1, end, List.of(), metrics, null, List.of(), null, Instant.EPOCH, Instant.EPOCH, Map.of(), manifest);
     }
@@ -64,5 +70,15 @@ class RunComparatorTest {
 
         assertThat(comparison.comparable()).isFalse();
         assertThat(comparison.issues()).extracting(RunComparison.Issue::field).containsExactly("manifest");
+    }
+
+    @Test
+    void differentMissingDatesAreAnIssue() {
+        RunRecord complete = run("a", 1, Map.of());
+        RunRecord gap = run("b", 1, JAN_31, "dh", "abc", json("{'costs': 'none'}"), RunStatus.COMPLETED, Map.of(),
+                List.of(LocalDate.of(2024, 1, 4)));
+
+        assertThat(RunComparator.compare(List.of(complete, gap)).issues())
+                .containsExactly(new RunComparison.Issue("b", "missingDates", "[]", "[2024-01-04]"));
     }
 }

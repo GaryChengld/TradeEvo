@@ -115,7 +115,7 @@ Unknown fields are rejected, so typos can't slip through.
 
 #### Missing data: three-valued rules
 
-Rules evaluate to `TRUE`, `FALSE` or `UNKNOWN`. A fact that is missing, null, of an incompatible type or unparseable gives `UNKNOWN`. It is never silently `FALSE`, so `Not(rsi > 55)` with no RSI is still `UNKNOWN`, not a match.
+Rules evaluate to `TRUE`, `FALSE` or `UNKNOWN`. A fact that is missing, null, NaN or infinite, of an incompatible type, or unparseable gives `UNKNOWN`. Numbers compare by exact decimal value, so large longs and `BigDecimal`s keep their precision. JSON decimals are read as doubles, so precision beyond a double is already gone after parsing. It is never silently `FALSE`, so `Not(rsi > 55)` with no RSI is still `UNKNOWN`, not a match.
 
 | | `All` | `Any` | `Not` |
 |---|---|---|---|
@@ -130,7 +130,17 @@ Every run records `ruleStats` (`matched` / `notMatched` / `unknown` per rule), w
 
 ### Data
 
-A backtest reads `{data-dir}/{dataset}/{yyyy-MM-dd}.json` for each date in the range. Dates without a file are skipped. An evaluation takes the same JSON in the request body instead. TradeEvo never interprets the contents; only the strategy class does.
+A backtest reads `{data-dir}/{dataset}/{yyyy-MM-dd}.json` for each date in the range. An evaluation takes the same JSON in the request body instead. TradeEvo never interprets the contents; only the strategy class does.
+
+**Coverage.** Ideally the data provider writes a file for every calendar day:
+
+| File for the day | Effect |
+|---|---|
+| Session data (any JSON the strategy understands) | Passed to the strategy |
+| `{"session": "closed", "reason": "..."}` | Non-trading day: skipped, recorded in the manifest's `closedDates` |
+| No file | Skipped, but recorded in `missingDates` with a run warning, since it may be an accidentally missing trading day |
+
+Closed and missing dates are part of `dataHash`, and `compare` reports runs whose `missingDates` differ. A range with no session data at all returns 404.
 
 Strategies should run record timestamps through `core.data.TimeOrder`, as the example does. Times must strictly increase across the whole run, including across file boundaries. Out-of-order, duplicate, missing or unparseable times fail the run with the record's location. Data is never reordered silently.
 
@@ -172,6 +182,8 @@ Configuration (`application.yml`, or `--tradeevo.data-dir=...` on the command li
 | `tradeevo.data-dir` | `./data` | raw data files |
 | `tradeevo.store-dir` | `./store` | `strategies/{id}/v{n}.json`, `runs/{runId}/result.json` |
 
+Store files are written atomically and never overwritten. They are written to a temp file, then published with a hard link, which is atomic and create-only. The store directory must therefore be on a filesystem with hard links (NTFS, ext4, XFS, APFS…). There is no weaker fallback: on a filesystem without them (e.g. FAT32, some network shares), writes fail with an explicit error.
+
 ## REST API
 
 | Method & path | Purpose |
@@ -201,7 +213,7 @@ curl -X POST localhost:8080/api/backtests  -H 'Content-Type: application/json' \
 
 ```bash
 java -jar tradeevo-app/target/tradeevo.jar backtest --config examples/threshold-signal.json \
-     --from 2024-01-01 --to 2024-01-31 --data-dir examples/data
+     --from 2024-01-01 --to 2024-01-07 --data-dir examples/data
 java -jar tradeevo-app/target/tradeevo.jar backtest --strategy-id threshold-signal [--strategy-version 2] \
      --from 2024-01-01 --to 2024-01-31
 ```

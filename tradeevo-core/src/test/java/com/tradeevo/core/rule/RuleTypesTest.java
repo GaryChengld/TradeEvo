@@ -149,4 +149,35 @@ class RuleTypesTest {
         assertThat(facts.with("extra", 1).has("extra")).isTrue();
         assertThat(facts.has("extra")).as("facts are immutable").isFalse();
     }
+
+    @Test
+    void nonFiniteNumbersAreUnknown() {
+        Rule gt = rule("Compare", "{'field': 'x', 'operator': '>', 'value': 100}");
+        Rule ne = rule("Compare", "{'field': 'x', 'operator': '!=', 'value': 100}");
+        Rule between = rule("Between", "{'field': 'x', 'min': 0, 'max': 1}");
+
+        for (Object value : new Object[] {Double.NaN, Double.POSITIVE_INFINITY, Double.NEGATIVE_INFINITY, Float.NaN}) {
+            assertThat(gt.evaluate(facts("x", value))).as("> with %s", value).isEqualTo(UNKNOWN);
+            assertThat(ne.evaluate(facts("x", value))).as("!= with %s", value).isEqualTo(UNKNOWN);
+            assertThat(between.evaluate(facts("x", value))).as("Between with %s", value).isEqualTo(UNKNOWN);
+        }
+        assertThat(rule("In", "{'field': 'x', 'values': [1]}").evaluate(facts("x", Double.NaN))).isEqualTo(FALSE);
+    }
+
+    @Test
+    void numbersCompareExactly() {
+        long big = 9_007_199_254_740_993L; // 2^53 + 1: not representable as a double
+        Rule eq = rule("Compare", "{'field': 'a', 'operator': '==', 'otherField': 'b'}");
+        assertThat(eq.evaluate(facts("a", big, "b", big - 1))).isEqualTo(FALSE);
+        assertThat(eq.evaluate(facts("a", new java.math.BigDecimal("0.30000000000000000001"),
+                "b", new java.math.BigDecimal("0.3")))).isEqualTo(FALSE);
+        assertThat(eq.evaluate(facts("a", 0.1, "b", new java.math.BigDecimal("0.10")))).isEqualTo(TRUE);
+        assertThat(eq.evaluate(facts("a", 2, "b", 2.0f))).isEqualTo(TRUE);
+        assertThat(eq.evaluate(facts("a", java.math.BigInteger.TEN.pow(30), "b", new java.math.BigDecimal("1E+30"))))
+                .isEqualTo(TRUE);
+
+        Rule between = rule("Between", "{'field': 'x', 'min': 0, 'max': 9007199254740992}");
+        assertThat(between.evaluate(facts("x", big))).as("just above max").isEqualTo(FALSE);
+        assertThat(between.evaluate(facts("x", big - 1))).isEqualTo(TRUE);
+    }
 }

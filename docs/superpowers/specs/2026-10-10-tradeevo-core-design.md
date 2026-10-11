@@ -122,3 +122,9 @@ Adding a strategy: create a `@Component` class implementing `Strategy` under `co
 - **Immutability:** JSON nodes in `StrategyConfig`, `RuleConfig`, `StrategyResult`, `RunRecord` and `RunManifest` are deep-copied on construction and on access.
 - **Signals vs P&L:** `StrategyResult.assumptions` declares the execution model. The example strategy is labeled signal-only and its metrics were renamed (`valueChangeTotal`, `valueChangeAverage`, `positiveSignalRate`).
 - **Comparable comparisons:** `RunComparator` flags differences in dataset, period, `dataHash`, engine build, assumptions, status or a missing manifest. `compare` returns `comparable` and `issues`; `strict=true` turns a non-comparable result into 409.
+
+## Revisions (2026-10-11, second review)
+
+- **Atomic writes, no fallback:** the non-atomic `Files.move` fallback is removed. Publication is hard-link only (atomic, create-only), and filesystems without hard links fail with an explicit error. Covered by `JsonFilesTest`.
+- **Numbers:** NaN and ±infinity are UNKNOWN in every rule. Numeric comparisons use exact `BigDecimal` values (integral types, `BigInteger` and `BigDecimal` keep full precision; doubles use their shortest decimal form). `Between` uses the same comparison.
+- **Data coverage:** `DataRepository.load` returns a `DataSet` (session files plus `DataCoverage`). A file `{"session": "closed"}` marks a non-trading day, which is skipped and recorded as closed. A day with no file is skipped but recorded as missing, with a run warning. Both lists are in the manifest and the data hash; `RunComparator` reports differing `missingDates`.

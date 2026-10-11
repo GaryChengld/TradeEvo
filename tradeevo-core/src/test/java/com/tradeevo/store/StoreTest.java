@@ -89,6 +89,7 @@ class StoreTest {
                 Instant.parse(startedAt), Instant.parse(startedAt),
                 Map.of("entry", new RuleStats(1, 2, 3)),
                 new RunManifest("1.0", "abc", false, "com.example.S", "sh", "ds", "dh",
-                        List.of(new RunManifest.DataFileHash(LocalDate.of(2024, 1, 2), "fh")), json("{'costs': 'none'}")));
+                        List.of(new RunManifest.DataFileHash(LocalDate.of(2024, 1, 2), "fh")),
+                        List.of(LocalDate.of(2024, 1, 1)), List.of(), json("{'costs': 'none'}")));
     }
 }

@@ -102,7 +102,10 @@ class ApiIntegrationTest {
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.status").value("COMPLETED"))
                 .andExpect(jsonPath("$.dataDates", hasSize(3)))
-                .andExpect(jsonPath("$.metrics.signals").value(3)));
+                .andExpect(jsonPath("$.metrics.signals").value(3))
+                .andExpect(jsonPath("$.manifest.closedDates", hasSize(3)))
+                .andExpect(jsonPath("$.manifest.missingDates[0]").value("2024-01-04"))
+                .andExpect(jsonPath("$.warnings[0]", containsString("have no data file and were skipped: 2024-01-04"))));
         JsonNode v2 = body(postJson("/api/backtests",
                 "{\"strategyId\": \"flow\", \"startDate\": \"2024-01-01\", \"endDate\": \"2024-01-31\"}")
                 .andExpect(status().isCreated())
@@ -182,7 +185,7 @@ class ApiIntegrationTest {
                 .andExpect(jsonPath("$.errors", hasItem("startDate: must not be null")));
         postJson("/api/backtests", "{\"strategyId\": \"dup\", \"startDate\": \"2030-01-01\", \"endDate\": \"2030-01-31\"}")
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.detail", containsString("No data files")));
+                .andExpect(jsonPath("$.detail", containsString("No session data")));
 
         postJson("/api/evaluations", "{\"strategy\": {\"strategyId\": \"dup\"}, \"data\": {\"rows\": []}}")
                 .andExpect(status().isUnprocessableEntity())

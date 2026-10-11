@@ -5,7 +5,6 @@ import java.util.List;
 
 import org.springframework.stereotype.Service;
 
-import com.tradeevo.core.data.DataFile;
 import com.tradeevo.core.data.DataRepository;
 import com.tradeevo.core.engine.RunComparator;
 import com.tradeevo.core.engine.RunComparison;
@@ -41,8 +40,8 @@ public class BacktestService {
     /** Validates the config, loads its dataset from {@code data} and runs it. Does not store the result. */
     public RunRecord execute(StrategyConfig config, LocalDate startDate, LocalDate endDate, DataRepository data) {
         engine.requireValid(config);
-        List<DataFile> files = data.load(config.effectiveDataset(), startDate, endDate);
-        return engine.run(config, files, RunMode.BACKTEST, startDate, endDate);
+        return engine.run(config, data.load(config.effectiveDataset(), startDate, endDate), RunMode.BACKTEST,
+                startDate, endDate);
     }
 
     public RunRecord get(String runId) {

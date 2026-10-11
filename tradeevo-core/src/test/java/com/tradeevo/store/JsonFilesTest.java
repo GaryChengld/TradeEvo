@@ -69,4 +69,22 @@ class JsonFilesTest {
             return entries.toList();
         }
     }
+
+    @Test
+    void failsClearlyWhenHardLinksAreUnsupportedAndLeavesNothingBehind() throws IOException {
+        Path file = dir.resolve("v1.json");
+
+        assertThatThrownBy(() -> JsonFiles.writeNew(TestSupport.MAPPER, file, Map.of("k", 1), (link, existing) -> {
+            throw new java.nio.file.FileSystemException(link.toString(), null, "Incorrect function");
+        }))
+                .isInstanceOf(UncheckedIOException.class)
+                .rootCause().hasMessageContaining("Incorrect function");
+        assertThatThrownBy(() -> JsonFiles.writeNew(TestSupport.MAPPER, file, Map.of("k", 1), (link, existing) -> {
+            throw new UnsupportedOperationException("no links");
+        }))
+                .isInstanceOf(UncheckedIOException.class)
+                .cause().hasMessageContaining("must be on a filesystem that supports hard links");
+
+        assertThat(list(dir)).as("no target, no temp file").isEmpty();
+    }
 }

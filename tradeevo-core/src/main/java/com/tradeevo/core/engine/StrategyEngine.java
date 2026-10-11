@@ -15,7 +15,9 @@ import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 import com.tradeevo.core.Identifiers;
+import com.tradeevo.core.data.DataCoverage;
 import com.tradeevo.core.data.DataFile;
+import com.tradeevo.core.data.DataSet;
 import com.tradeevo.core.error.InvalidConfigException;
 import com.tradeevo.core.rule.RuleFactory;
 import com.tradeevo.core.rule.RuleRegistry;
@@ -105,12 +107,22 @@ public class StrategyEngine {
      * @param endDate   the requested range end, recorded as-is (null for evaluations)
      */
     public RunRecord run(StrategyConfig config, List<DataFile> data, RunMode mode, LocalDate startDate, LocalDate endDate) {
+        return run(config, data, DataCoverage.NONE, mode, startDate, endDate);
+    }
+
+    /** Runs over a loaded date range; closed and missing dates go into the manifest, missing ones into warnings. */
+    public RunRecord run(StrategyConfig config, DataSet data, RunMode mode, LocalDate startDate, LocalDate endDate) {
+        return run(config, data.files(), data.coverage(), mode, startDate, endDate);
+    }
+
+    private RunRecord run(StrategyConfig config, List<DataFile> data, DataCoverage coverage, RunMode mode,
+            LocalDate startDate, LocalDate endDate) {
         requireValid(config);
         Strategy strategy = strategies.find(config.strategyClass()).orElseThrow();
         RuleSet rules = ruleFactory.buildRuleSet(config.rules());
         List<LocalDate> dataDates = data.stream().map(DataFile::date).filter(Objects::nonNull).toList();
         // Fingerprint the inputs before the strategy sees them.
-        RunManifest manifest = RunManifest.of(EngineVersion.current(), config, data);
+        RunManifest manifest = RunManifest.of(EngineVersion.current(), config, data, coverage);
 
         Instant startedAt = clock.instant();
         String runId = RUN_ID_TIME.format(startedAt) + "-" + UUID.randomUUID().toString().substring(0, 8);
@@ -121,6 +133,7 @@ public class StrategyEngine {
             }
             Map<String, RuleStats> stats = rules.stats();
             List<String> warnings = new ArrayList<>(result.warnings());
+            warnings.addAll(coverageWarnings(coverage));
             warnings.addAll(unknownWarnings(stats));
             return new RunRecord(runId, RunStatus.COMPLETED, mode, config, startDate, endDate, dataDates,
                     result.metrics(), result.details(), warnings, null, startedAt, clock.instant(),
@@ -129,8 +142,20 @@ public class StrategyEngine {
             log.warn("Run {} of strategy {} v{} failed", runId, config.id(), config.version(), e);
             String message = e.getClass().getSimpleName() + (e.getMessage() != null ? ": " + e.getMessage() : "");
             return new RunRecord(runId, RunStatus.FAILED, mode, config, startDate, endDate, dataDates,
-                    Map.of(), null, List.of(), message, startedAt, clock.instant(), rules.stats(), manifest);
+                    Map.of(), null, coverageWarnings(coverage), message, startedAt, clock.instant(), rules.stats(), manifest);
         }
+    }
+
+    private static List<String> coverageWarnings(DataCoverage coverage) {
+        List<LocalDate> missing = coverage.missingDates();
+        if (missing.isEmpty()) {
+            return List.of();
+        }
+        int shown = Math.min(missing.size(), 10);
+        String dates = String.join(", ", missing.subList(0, shown).stream().map(LocalDate::toString).toList())
+                + (missing.size() > shown ? ", ... (" + (missing.size() - shown) + " more)" : "");
+        return List.of(missing.size() + " date(s) have no data file and were skipped: " + dates
+                + ". Mark non-trading days with {\"session\": \"closed\"} files so real gaps stand out.");
     }
 
     private static List<String> unknownWarnings(Map<String, RuleStats> stats) {

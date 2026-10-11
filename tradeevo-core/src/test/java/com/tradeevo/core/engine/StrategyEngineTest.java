@@ -206,4 +206,24 @@ class StrategyEngineTest {
                 "UnknownFactsException: rule 'entry' is UNKNOWN (onUnknown=FAIL): missing facts [x]");
         assertThat(record.ruleStats()).containsEntry("entry", new com.tradeevo.core.rule.RuleStats(0, 0, 1));
     }
+
+    @Test
+    void coverageGoesIntoTheManifestAndMissingDatesIntoWarnings() {
+        StrategyConfig config = config(RecordingStrategy.class, null);
+        List<DataFile> files = List.of(new DataFile(LocalDate.of(2024, 1, 2), json("{'a': 1}")));
+        com.tradeevo.core.data.DataCoverage none = com.tradeevo.core.data.DataCoverage.NONE;
+        com.tradeevo.core.data.DataCoverage gaps = new com.tradeevo.core.data.DataCoverage(
+                List.of(LocalDate.of(2024, 1, 6)), List.of(LocalDate.of(2024, 1, 3), LocalDate.of(2024, 1, 4)));
+
+        RunRecord complete = engine.run(config, new com.tradeevo.core.data.DataSet(files, none), RunMode.BACKTEST, null, null);
+        RunRecord withGaps = engine.run(config, new com.tradeevo.core.data.DataSet(files, gaps), RunMode.BACKTEST, null, null);
+
+        assertThat(complete.warnings()).isEmpty();
+        assertThat(withGaps.manifest().closedDates()).containsExactly(LocalDate.of(2024, 1, 6));
+        assertThat(withGaps.manifest().missingDates()).containsExactly(LocalDate.of(2024, 1, 3), LocalDate.of(2024, 1, 4));
+        assertThat(withGaps.manifest().dataHash()).as("coverage is part of the data hash")
+                .isNotEqualTo(complete.manifest().dataHash());
+        assertThat(withGaps.warnings()).containsExactly("2 date(s) have no data file and were skipped: 2024-01-03, "
+                + "2024-01-04. Mark non-trading days with {\"session\": \"closed\"} files so real gaps stand out.");
+    }
 }

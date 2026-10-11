@@ -3,6 +3,7 @@ package com.tradeevo.core.rule.types;
 import static com.tradeevo.core.rule.ParamSpec.optional;
 import static com.tradeevo.core.rule.ParamSpec.required;
 
+import java.math.BigDecimal;
 import java.util.List;
 
 
@@ -13,6 +14,7 @@ import com.tradeevo.core.rule.Rule;
 import com.tradeevo.core.rule.RuleFactory;
 import com.tradeevo.core.rule.RuleType;
 import com.tradeevo.core.rule.Truth;
+import com.tradeevo.core.rule.Values;
 
 /** {@code min <= field <= max} (or strict, when not inclusive). */
 public class BetweenRule implements RuleType {
@@ -30,7 +32,7 @@ public class BetweenRule implements RuleType {
 
     @Override
     public String description() {
-        return "Matches when a numeric fact lies between min and max. A missing or non-numeric fact is UNKNOWN.";
+        return "Matches when a numeric fact lies between min and max. A missing, non-numeric, NaN or infinite fact is UNKNOWN. Compared as exact decimals.";
     }
 
     @Override
@@ -40,7 +42,7 @@ public class BetweenRule implements RuleType {
 
     @Override
     public List<String> validateParams(JsonNode params, String path) {
-        if (params.get("min").doubleValue() > params.get("max").doubleValue()) {
+        if (params.get("min").decimalValue().compareTo(params.get("max").decimalValue()) > 0) {
             return List.of(path + ": 'min' must be <= 'max'");
         }
         return List.of();
@@ -49,15 +51,17 @@ public class BetweenRule implements RuleType {
     @Override
     public Rule create(JsonNode params, RuleFactory factory) {
         String field = params.get("field").textValue();
-        double min = params.get("min").doubleValue();
-        double max = params.get("max").doubleValue();
+        BigDecimal min = params.get("min").decimalValue();
+        BigDecimal max = params.get("max").decimalValue();
         boolean inclusive = params.get("inclusive").booleanValue();
         return facts -> {
-            if (!(facts.get(field) instanceof Number number)) {
+            BigDecimal value = facts.get(field) instanceof Number number ? Values.toDecimal(number) : null;
+            if (value == null) {
                 return Truth.UNKNOWN;
             }
-            double value = number.doubleValue();
-            return Truth.of(inclusive ? value >= min && value <= max : value > min && value < max);
+            int low = value.compareTo(min);
+            int high = value.compareTo(max);
+            return Truth.of(inclusive ? low >= 0 && high <= 0 : low > 0 && high < 0);
         };
     }
 }

@@ -21,15 +21,29 @@ final class JsonFiles {
     private JsonFiles() {
     }
 
+    /** Creates {@code link} as a hard link to {@code existing}; replaceable in tests. */
+    @FunctionalInterface
+    interface Linker {
+        void link(Path link, Path existing) throws IOException;
+    }
+
     /**
-     * Writes a new file atomically and never overwrites: the JSON is written and synced to a temp
-     * file in the same directory, then published under the final name with a hard link (atomic and
-     * create-only), falling back to a non-replacing move where hard links are unsupported. Readers
-     * therefore see either no file or the complete file. On any failure the temp file is removed.
+     * Writes a new file atomically and never overwrites. The JSON is written and synced to a temp
+     * file in the same directory, then published under the final name with a hard link, which is
+     * atomic and create-only: readers see either no file or the complete file, and an existing file
+     * is never replaced, even under concurrent writers. On any failure the temp file is removed.
+     *
+     * <p>The store directory must be on a filesystem with hard links (NTFS, ext4, XFS, APFS, ...).
+     * There is deliberately no weaker fallback: elsewhere the write fails with an explanatory error.
      *
      * @throws FileAlreadyExistsException if {@code file} already exists; it is left untouched
+     * @throws UncheckedIOException if the write fails, including when hard links are not supported
      */
     static void writeNew(ObjectMapper mapper, Path file, Object value) throws FileAlreadyExistsException {
+        writeNew(mapper, file, value, Files::createLink);
+    }
+
+    static void writeNew(ObjectMapper mapper, Path file, Object value, Linker linker) throws FileAlreadyExistsException {
         Path temp = null;
         try {
             Files.createDirectories(file.getParent());
@@ -45,7 +59,7 @@ final class JsonFiles {
                 out.flush();
                 channel.force(true);
             }
-            publish(temp, file);
+            publish(linker, temp, file);
         } catch (FileAlreadyExistsException e) {
             throw e;
         } catch (IOException e) {
@@ -61,14 +75,14 @@ final class JsonFiles {
         }
     }
 
-    private static void publish(Path temp, Path file) throws IOException {
+    private static void publish(Linker linker, Path temp, Path file) throws IOException {
         try {
-            Files.createLink(file, temp);
+            linker.link(file, temp);
         } catch (FileAlreadyExistsException e) {
             throw e;
         } catch (UnsupportedOperationException | FileSystemException e) {
-            // No hard links here: a move without REPLACE_EXISTING is still create-only.
-            Files.move(temp, file);
+            throw new IOException("Could not publish " + file + " with a hard link. The store directory must be on a "
+                    + "filesystem that supports hard links, which atomic create-only writes rely on", e);
         }
     }
 
