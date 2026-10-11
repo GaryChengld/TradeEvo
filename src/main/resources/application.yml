@@ -1,0 +1,13 @@
+spring:
+  application:
+    name: tradeevo
+  jackson:
+    deserialization:
+      # Reject typos in strategy configs and requests instead of silently ignoring them.
+      fail-on-unknown-properties: true
+
+tradeevo:
+  # Raw data files: {data-dir}/{dataset}/{yyyy-MM-dd}.json
+  data-dir: ./data
+  # Strategy versions and run results (JSON files)
+  store-dir: ./store
