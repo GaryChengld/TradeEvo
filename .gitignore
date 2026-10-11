@@ -1,20 +1,17 @@
-# Python
-__pycache__/
-*.py[cod]
-*.egg-info/
-.venv/
-venv/
-.env
+# Build
+target/
 
-# Node / frontend
-node_modules/
-dist/
-build/
+# Runtime data (written by external apps / TradeEvo); examples/ is tracked
+/data/
+/store/
+/results/
 
 # IDE
 .vscode/
 .idea/
+*.iml
 
 # OS
 .DS_Store
 Thumbs.db
+settings.local.json
