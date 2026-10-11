@@ -1,0 +1,31 @@
+{
+  "id": "threshold-signal",
+  "description": "Example: open when x > 0.3 between 09:30 and 15:00; close when pnl >= 2 or pnl <= -1",
+  "strategyClass": "com.tradeevo.strategies.example.ThresholdSignalStrategy",
+  "dataset": "example",
+  "settings": { "closeAtEnd": true },
+  "rules": [
+    {
+      "name": "entry",
+      "rule": "All",
+      "params": {
+        "rules": [
+          { "rule": "Compare", "params": { "field": "x", "operator": ">", "value": 0.3 } },
+          { "rule": "TimeWindow", "params": { "field": "time", "start": "09:30", "end": "15:00" } }
+        ]
+      },
+      "action": "OPEN"
+    },
+    {
+      "name": "exit",
+      "rule": "Any",
+      "params": {
+        "rules": [
+          { "rule": "Compare", "params": { "field": "pnl", "operator": ">=", "value": 2.0 } },
+          { "rule": "Compare", "params": { "field": "pnl", "operator": "<=", "value": -1.0 } }
+        ]
+      },
+      "action": "CLOSE"
+    }
+  ]
+}
