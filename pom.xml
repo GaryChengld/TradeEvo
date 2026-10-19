@@ -54,6 +54,7 @@
                     <configuration>
                         <systemPropertyVariables>
                             <tradeevo.examples>${maven.multiModuleProjectDirectory}/examples</tradeevo.examples>
+                            <tradeevo.config>${maven.multiModuleProjectDirectory}/config</tradeevo.config>
                         </systemPropertyVariables>
                     </configuration>
                 </plugin>

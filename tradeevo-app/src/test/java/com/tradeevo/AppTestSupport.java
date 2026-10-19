@@ -17,6 +17,8 @@ public final class AppTestSupport {
     public static final Path EXAMPLES = Path.of(System.getProperty("tradeevo.examples", "../examples")).toAbsolutePath();
     public static final Path EXAMPLE_CONFIG = EXAMPLES.resolve("threshold-signal.json");
     public static final Path EXAMPLE_DATA_DIR = EXAMPLES.resolve("data");
+    public static final Path PRICING_FILE = Path.of(System.getProperty("tradeevo.config", "../config"))
+            .toAbsolutePath().resolve("pricing-models.json");
 
     public static final ObjectMapper MAPPER = new ObjectMapper()
             .findAndRegisterModules()

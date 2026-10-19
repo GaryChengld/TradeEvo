@@ -7,6 +7,7 @@ import org.springframework.context.annotation.Configuration;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
 import com.tradeevo.core.data.DataRepository;
+import com.tradeevo.pricing.SpreadPricers;
 import com.tradeevo.store.RunStore;
 import com.tradeevo.store.StrategyStore;
 
@@ -31,5 +32,10 @@ public class TradeEvoConfiguration {
     @Bean
     RunStore runStore(TradeEvoProperties properties, ObjectMapper mapper) {
         return new RunStore(properties.storeDir(), mapper);
+    }
+
+    @Bean
+    SpreadPricers spreadPricers(TradeEvoProperties properties, ObjectMapper mapper) {
+        return new SpreadPricers(properties.pricingFile(), mapper);
     }
 }

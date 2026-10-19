@@ -1,0 +1,22 @@
+{
+  "defaultModel": "black-scholes",
+  "time": {
+    "expiration": "16:00",
+    "tradingDaysPerYear": 252,
+    "sessionMinutes": 390
+  },
+  "models": {
+    "black-scholes": {
+      "ivMultiplier": 1.0,
+      "rate": 0.0,
+      "dividend": 0.0
+    },
+    "empirical": {
+      "base": 0.3,
+      "decay": 3.8,
+      "cScale": 1.34, "cPivot": 138, "cExponent": 0.45, "cMin": 0.8, "cMax": 2.1,
+      "mHeight": 0.22, "mCenter": 240, "mWidth": 55,
+      "aHeight": 0.22, "aCenter": 150, "aWidth": 45
+    }
+  }
+}

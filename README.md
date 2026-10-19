@@ -166,6 +166,22 @@ Each run record contains a `manifest`:
 
 Then reference the class in a config. The engine needs no changes. See `tradeevo-app/.../strategies/example/ThresholdSignalStrategy` for a complete example.
 
+### SPX 0DTE option pricing
+
+Strategies whose data has SPX and VIX but no option quotes can price same-day (0DTE) options and credit spreads with `com.tradeevo.pricing` in `tradeevo-app`. See `docs/superpowers/specs/2026-10-18-spx-0dte-option-price-simulator-design.md` for the full design.
+
+- **Models:**
+  - `black-scholes` (the default) uses σ = VIX/100 × `ivMultiplier`.
+  - `empirical` is a calibrated credit-spread formula.
+- **Time:** annual variance is spread over trading minutes only: years = minutes to expiration / (252 × 390). Calendar minutes would underprice 0DTE options by about 2.3×.
+- **Parameters:** every model parameter is in `config/pricing-models.json`. There are no defaults in Java, and unknown or missing keys are errors.
+  - Set the file's location with `tradeevo.pricing-file`.
+  - The file is read on first use and kept until restart.
+- **In a strategy:** inject `SpreadPricers` and call `create(settings.get("pricing"))`. Add `validate(pricing, "settings.pricing")` to the strategy's `validate`.
+  - The `pricing` block chooses a model and overrides parameters, e.g. `{"model": "empirical", "overrides": {"expiration": "13:00"}}`.
+  - Copy `ResolvedPricer.parameters()` into the result's `assumptions` under `pricing`. The run then records the parameters it used, and `compare` reports runs priced differently.
+- **Accuracy:** prices are estimates. Within ±20% of a market-based reference is acceptable; mathematical bounds such as 0 ≤ spread ≤ width hold exactly.
+
 ## Build & run
 
 Requires JDK 25. Maven is provided by the wrapper.
