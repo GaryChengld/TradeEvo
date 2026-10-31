@@ -65,7 +65,7 @@ class VolatilitySensitivityTest {
 
     @Test
     void multiplierEqualsScalingVix() {
-        for (double k : new double[] {0.5, 1.0, 1.15, 2.0}) {
+        for (double k : new double[] {0.5, 0.8, 1.0, 1.15, 1.2, 2.0}) {
             ZeroDteOptionPricer scaled = new ZeroDteOptionPricer(TIME, new BlackScholesParams(k, 0, 0));
             for (double strike : new double[] {4950, 5000, 5050}) {
                 for (OptionType type : OptionType.values()) {

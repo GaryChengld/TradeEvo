@@ -8,7 +8,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 
 /** The value rules for pricing parameters: one source for both the JSON checks and the records. */
 enum ParamKind {
-    FINITE, POSITIVE, POSITIVE_INTEGER, TIME_OF_DAY;
+    FINITE, NON_NEGATIVE, POSITIVE, POSITIVE_INTEGER, TIME_OF_DAY;
 
     private static final Pattern HH_MM = Pattern.compile("\\d{2}:\\d{2}");
 
@@ -33,10 +33,13 @@ enum ParamKind {
         };
     }
 
-    /** Why a number is invalid for {@link #FINITE} or {@link #POSITIVE}, or null if it is valid. */
+    /** Why a number is invalid for {@link #FINITE}, {@link #NON_NEGATIVE} or {@link #POSITIVE}, or null if valid. */
     String problem(double value) {
         if (!Double.isFinite(value)) {
             return "must be a finite number";
+        }
+        if (this == NON_NEGATIVE && value < 0) {
+            return "must be >= 0";
         }
         if ((this == POSITIVE || this == POSITIVE_INTEGER) && value <= 0) {
             return "must be > 0";

@@ -77,6 +77,16 @@ class PricingModelsTest {
                 .containsExactly("models.empirical.decay: must be a number");
         assertThat(errorsAfter(r -> model(r, "empirical").put("cMin", 2.5)))
                 .containsExactly("models.empirical.cMin: must be <= cMax, was 2.5 > 2.1");
+        assertThat(errorsAfter(r -> model(r, "empirical").put("base", -0.1)))
+                .containsExactly("models.empirical.base: must be >= 0");
+        assertThat(errorsAfter(r -> model(r, "empirical").put("cScale", -1)))
+                .containsExactly("models.empirical.cScale: must be >= 0");
+        assertThat(errorsAfter(r -> model(r, "empirical").put("cMin", -0.5)))
+                .containsExactly("models.empirical.cMin: must be >= 0");
+        assertThat(errorsAfter(r -> model(r, "empirical").put("mHeight", -2)))
+                .containsExactly("models.empirical.mHeight: must be >= 0");
+        assertThat(errorsAfter(r -> model(r, "empirical").put("aHeight", -2)))
+                .containsExactly("models.empirical.aHeight: must be >= 0");
         assertThat(errorsAfter(r -> ((ObjectNode) r.get("time")).put("expiration", "4pm")))
                 .containsExactly("time.expiration: must be a time HH:mm");
         assertThat(errorsAfter(r -> ((ObjectNode) r.get("time")).put("expiration", "25:00")))

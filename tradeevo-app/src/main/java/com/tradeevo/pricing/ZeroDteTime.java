@@ -21,11 +21,14 @@ public final class ZeroDteTime {
         this.params = params;
     }
 
-    /** Minutes from {@code now} to expiration, with seconds as fractions; 0 at or after expiration. */
+    /**
+     * Minutes from {@code now} to expiration, with seconds as fractions; 0 at or after expiration, and at most
+     * {@code sessionMinutes}, so a time before the open prices like the open.
+     */
     public double minutesLeft(LocalTime now) {
         Inputs.requireNonNull("now", now);
         long nanos = Duration.between(now, params.expiration()).toNanos();
-        return nanos <= 0 ? 0 : nanos / NANOS_PER_MINUTE;
+        return nanos <= 0 ? 0 : Math.min(nanos / NANOS_PER_MINUTE, params.sessionMinutes());
     }
 
     /** Years left, where one year is {@code tradingDaysPerYear * sessionMinutes} trading minutes. */

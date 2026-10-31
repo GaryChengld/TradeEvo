@@ -16,6 +16,11 @@ import java.time.LocalTime;
  * <li>N &lt; 0 (in the money): {@code max(intrinsic, width - (width - f(0)) * exp(-decay * |N|))}, which is
  * continuous at the strike and approaches the width deep in the money.</li>
  * </ul>
+ *
+ * <p>Known limits: the price scales linearly with width, so the model suits narrow spreads only (at 12:00 with
+ * SPX 5000 and VIX 15, an at-the-money spread is worth more than the Black-Scholes value of its short leg once
+ * it is wider than about 23 points). Exactly at the money the price holds at about 0.24 * width until the final
+ * moment, then drops to 0 at expiry.
  */
 public final class EmpiricalSpreadPricer implements SpreadPricer {
 
@@ -43,10 +48,14 @@ public final class EmpiricalSpreadPricer implements SpreadPricer {
         double c = Math.min(Math.max(p.cScale() * Math.pow(t / p.cPivot(), p.cExponent()), p.cMin()), p.cMax());
         double m = 1 + p.mHeight() * Math.exp(-Math.pow(t - p.mCenter(), 2) / (2 * p.mWidth() * p.mWidth()));
         double a = 1 + p.aHeight() * Math.exp(-Math.pow(t - p.aCenter(), 2) / (2 * p.aWidth() * p.aWidth()));
+        double price;
         if (n >= 0) {
-            return Math.min(width * p.base() * Math.exp(-p.decay() * n) * c * m * a, width);
+            price = Math.min(width * p.base() * Math.exp(-p.decay() * n) * c * m * a, width);
+        } else {
+            double atStrike = Math.min(width * p.base() * c * m * a, width);
+            price = Math.max(intrinsic, width - (width - atStrike) * Math.exp(-p.decay() * -n));
         }
-        double atStrike = Math.min(width * p.base() * c * m * a, width);
-        return Math.max(intrinsic, width - (width - atStrike) * Math.exp(-p.decay() * -n));
+        Inputs.requireFinite("price", price);
+        return price;
     }
 }

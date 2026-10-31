@@ -23,6 +23,12 @@ class ZeroDteTimeTest {
     }
 
     @Test
+    void capsTimeLeftAtTheSessionLengthBeforeTheOpen() {
+        assertThat(time.minutesLeft(LocalTime.of(9, 0))).isEqualTo(390);
+        assertThat(time.years(LocalTime.of(9, 0))).isEqualTo(time.years(LocalTime.of(9, 30)));
+    }
+
+    @Test
     void yearsUseTradingTime() {
         assertThat(time.years(LocalTime.of(9, 30))).isCloseTo(1.0 / 252, within(1e-15));
         assertThat(time.years(LocalTime.of(10, 0))).isCloseTo(360.0 / 98_280, within(1e-15));
@@ -46,5 +52,15 @@ class ZeroDteTimeTest {
                 .hasMessageStartingWith("cMin: must be <= cMax");
         assertThatThrownBy(() -> new EmpiricalParams(0.3, 0, 1.34, 138, 0.45, 0.8, 2.1, 0.22, 240, 55, 0.22, 150, 45))
                 .hasMessageStartingWith("decay: must be > 0");
+        assertThatThrownBy(() -> new EmpiricalParams(-0.1, 3.8, 1.34, 138, 0.45, 0.8, 2.1, 0.22, 240, 55, 0.22, 150, 45))
+                .hasMessageStartingWith("base: must be >= 0");
+        assertThatThrownBy(() -> new EmpiricalParams(0.3, 3.8, -1, 138, 0.45, 0.8, 2.1, 0.22, 240, 55, 0.22, 150, 45))
+                .hasMessageStartingWith("cScale: must be >= 0");
+        assertThatThrownBy(() -> new EmpiricalParams(0.3, 3.8, 1.34, 138, 0.45, -0.5, 2.1, 0.22, 240, 55, 0.22, 150, 45))
+                .hasMessageStartingWith("cMin: must be >= 0");
+        assertThatThrownBy(() -> new EmpiricalParams(0.3, 3.8, 1.34, 138, 0.45, 0.8, 2.1, -2, 240, 55, 0.22, 150, 45))
+                .hasMessageStartingWith("mHeight: must be >= 0");
+        assertThatThrownBy(() -> new EmpiricalParams(0.3, 3.8, 1.34, 138, 0.45, 0.8, 2.1, 0.22, 240, 55, -2, 150, 45))
+                .hasMessageStartingWith("aHeight: must be >= 0");
     }
 }

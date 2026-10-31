@@ -8,6 +8,7 @@ import static com.tradeevo.pricing.PricingFixtures.VIX;
 import static com.tradeevo.pricing.SpreadDirection.BEAR_CALL;
 import static com.tradeevo.pricing.SpreadDirection.BULL_PUT;
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.time.LocalTime;
 
@@ -84,6 +85,18 @@ class EmpiricalSpreadPricerTest {
             assertThat(EMPIRICAL_SPREADS.price(SPX, VIX, now, BULL_PUT, 5004, 4994)).as("partly ITM").isEqualTo(4);
             assertThat(EMPIRICAL_SPREADS.price(SPX, VIX, now, BEAR_CALL, 4996, 5006)).as("partly ITM").isEqualTo(4);
         }
+    }
+
+    @Test
+    void rejectsANonFinitePrice() {
+        // At 12:00, T equals mCenter and the tiny width makes the Gaussian exponent 0/0.
+        SpreadPricer pricer = new EmpiricalSpreadPricer(PricingFixtures.TIME,
+                new EmpiricalParams(0.3, 3.8, 1.34, 138, 0.45, 0.8, 2.1, 0.22, 240, 1e-200, 0.22, 150, 45));
+
+        assertThatThrownBy(() -> pricer.price(SPX, VIX, NOON, BULL_PUT, 4990, 4980)).as("out of the money")
+                .isInstanceOf(IllegalArgumentException.class).hasMessageStartingWith("price:");
+        assertThatThrownBy(() -> pricer.price(SPX, VIX, NOON, BULL_PUT, 5010, 5000)).as("in the money")
+                .isInstanceOf(IllegalArgumentException.class).hasMessageStartingWith("price:");
     }
 
     @Test

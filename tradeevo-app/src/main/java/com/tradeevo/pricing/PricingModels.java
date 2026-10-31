@@ -42,17 +42,17 @@ public final class PricingModels {
                     "rate", ParamKind.FINITE,
                     "dividend", ParamKind.FINITE),
             EMPIRICAL, schema(
-                    "base", ParamKind.FINITE,
+                    "base", ParamKind.NON_NEGATIVE,
                     "decay", ParamKind.POSITIVE,
-                    "cScale", ParamKind.FINITE,
+                    "cScale", ParamKind.NON_NEGATIVE,
                     "cPivot", ParamKind.POSITIVE,
                     "cExponent", ParamKind.FINITE,
-                    "cMin", ParamKind.FINITE,
+                    "cMin", ParamKind.NON_NEGATIVE,
                     "cMax", ParamKind.FINITE,
-                    "mHeight", ParamKind.FINITE,
+                    "mHeight", ParamKind.NON_NEGATIVE,
                     "mCenter", ParamKind.FINITE,
                     "mWidth", ParamKind.POSITIVE,
-                    "aHeight", ParamKind.FINITE,
+                    "aHeight", ParamKind.NON_NEGATIVE,
                     "aCenter", ParamKind.FINITE,
                     "aWidth", ParamKind.POSITIVE));
 

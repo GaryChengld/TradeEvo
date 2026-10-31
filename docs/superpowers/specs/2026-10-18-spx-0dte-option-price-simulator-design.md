@@ -18,7 +18,7 @@ Scope is **0DTE**: every option expires at the close of the current trading day.
 Almost all variance on expiry day accrues during trading minutes. Spreading VIX's annual variance over the 525,600 calendar minutes of a year underprices 0DTE options by about √5.35 ≈ 2.3×. Annual variance is therefore assigned to trading time only:
 
 ```
-minutesLeft = minutes from now to expiration (0 if now ≥ expiration)
+minutesLeft = minutes from now to expiration (0 if now ≥ expiration, at most sessionMinutes)
 years       = minutesLeft / (tradingDaysPerYear × sessionMinutes)
 σ           = VIX / 100
 EM          = SPX × σ × √years                    (expected move, in index points)
@@ -76,6 +76,7 @@ Rules:
   - `tradingDaysPerYear` and `sessionMinutes` must be positive integers.
   - `defaultModel` must name a model in `models`.
   - `ivMultiplier`, `decay`, `cPivot`, `mWidth` and `aWidth` must be > 0.
+  - `base`, `cScale`, `cMin`, `mHeight` and `aHeight` must be ≥ 0, so no empirical factor can go negative.
   - `cMin` ≤ `cMax`.
 - **Errors are reported together,** each with its JSON path, e.g. `models.empirical.decay: must be > 0`.
 
@@ -147,7 +148,13 @@ Pricing rules:
 - **N ≥ 0 (out of the money):** returns f(N), identical to the original function.
 - **N < 0 (in the money):** returns max(intrinsic, width − (width − f₀) × exp(−decay × |N|)), where f₀ = f(0). (The original returned the intrinsic value, which dropped by about 0.65 × width at the strike.) This is continuous at the strike, approaches the width deep in the money, and never falls below intrinsic.
 
-With the shipped parameters, the out-of-the-money values are much lower than Black-Scholes beyond about 0.3 EM. For example, at 12:00 and N = 1 this model gives 0.015 × width, against about 0.16 for Black-Scholes. Comparing backtest runs that use the two models is how to judge them.
+With the shipped parameters, the out-of-the-money values are much lower than Black-Scholes beyond about 0.3 EM. For example, at 12:00 and N = 1 this model gives 0.015 × width, against about 0.14 for Black-Scholes. Comparing backtest runs that use the two models is how to judge them.
+
+A price that is not finite, which only extreme parameters can produce, throws `IllegalArgumentException`.
+
+Known limits, left in place because there are no real quotes to re-fit against:
+- The price scales linearly with width, so the model suits narrow spreads only. At 12:00 with SPX 5000 and VIX 15, an at-the-money spread is worth more than the Black-Scholes value of its short leg once it is wider than about 23 points.
+- Exactly at the money, the price holds at about 0.24 × width until the final moment, then drops to 0 at expiry.
 
 ## Validation at call time
 
@@ -187,7 +194,7 @@ Out of scope here: a 20% gap between the two models is not a failure. At N = 1 t
   - With SPX 5000, VIX 15 at 10:00, the ATM straddle is within ±20% of $36, i.e. $28.80–$43.20. This is consistent with the market rule of thumb of 0.7–1% of SPX.
   - From the expiration time onwards, the price equals the intrinsic value.
   - `ivMultiplier` 1.0 matches plain σ = VIX/100. Pricing with a multiplier k equals pricing with plain σ at VIX × k. The price rises with the multiplier.
-- **`ZeroDteTime`:** 16:00 gives 0 minutes; 15:59:30 gives 0.5 minutes; after 16:00 gives 0; a different expiration, trading-days and session-minutes setting is honored.
+- **`ZeroDteTime`:** 16:00 gives 0 minutes; 15:59:30 gives 0.5 minutes; after 16:00 gives 0; 09:00 gives 390, the same as the open; a different expiration, trading-days and session-minutes setting is honored.
 - **`EmpiricalSpreadPricer`:**
   - Out of the money, matches a port of the original function to 1e-12 at sample points.
   - At N = 0, the values on either side differ by < 1e-9.

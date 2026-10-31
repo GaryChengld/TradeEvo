@@ -89,6 +89,8 @@ class SpreadPricersTest {
                         "settings.pricing.overrides.expiration: must be a time HH:mm");
         assertThat(pricers.validate(json("{'model': 'empirical', 'overrides': {'cMin': 3}}"), "settings.pricing"))
                 .containsExactly("settings.pricing.overrides.cMin: cMin must be <= cMax, was 3 > 2.1");
+        assertThat(pricers.validate(json("{'model': 'empirical', 'overrides': {'base': -0.1}}"), "settings.pricing"))
+                .containsExactly("settings.pricing.overrides.base: must be >= 0");
         assertThat(pricers.validate(json("{'model': 'binomial'}"), "settings.pricing"))
                 .containsExactly("settings.pricing.model: must be one of [black-scholes, empirical]");
         assertThat(pricers.validate(json("[]"), "settings.pricing")).containsExactly("settings.pricing: must be an object");
