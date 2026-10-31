@@ -7,8 +7,9 @@ import java.time.LocalTime;
  * Time left until today's expiration, on a trading-time basis.
  *
  * <p>Known simplifications: the session carries the whole day's variance (the overnight share, roughly
- * 20–25%, has already passed by the open, so this slightly overstates the variance left), and variance is
- * uniform within the day (the open, the close and events such as FOMC are not weighted).
+ * 20–25%, has already passed by the open, which overstates volatility by 11–13%; the shipped
+ * {@code ivMultiplier} offsets this), and variance is uniform within the day (the open, the close and events
+ * such as FOMC are not weighted).
  */
 public final class ZeroDteTime {
 
@@ -22,13 +23,14 @@ public final class ZeroDteTime {
     }
 
     /**
-     * Minutes from {@code now} to expiration, with seconds as fractions; 0 at or after expiration, and at most
-     * {@code sessionMinutes}, so a time before the open prices like the open.
+     * Minutes from {@code now} to expiration, with seconds as fractions; 0 at or after expiration. A time before
+     * the open prices like the open.
      */
     public double minutesLeft(LocalTime now) {
         Inputs.requireNonNull("now", now);
-        long nanos = Duration.between(now, params.expiration()).toNanos();
-        return nanos <= 0 ? 0 : Math.min(nanos / NANOS_PER_MINUTE, params.sessionMinutes());
+        LocalTime from = now.isBefore(params.open()) ? params.open() : now;
+        long nanos = Duration.between(from, params.expiration()).toNanos();
+        return nanos <= 0 ? 0 : nanos / NANOS_PER_MINUTE;
     }
 
     /** Years left, where one year is {@code tradingDaysPerYear * sessionMinutes} trading minutes. */

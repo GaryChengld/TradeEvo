@@ -8,7 +8,9 @@ import java.util.Map;
 
 /**
  * Inline parameters and helpers for pricing tests, so the tests don't depend on the shipped parameters file.
- * The values equal the shipped ones; {@code PricingModelsTest} checks the file itself.
+ * The values equal the shipped ones, except that {@link #BS} keeps a neutral {@code ivMultiplier} of 1.0 so the
+ * tests of the mathematics don't depend on calibration; {@link #SHIPPED_BS} has the shipped value.
+ * {@code PricingModelsTest} checks the file itself.
  */
 final class PricingFixtures {
 
@@ -17,12 +19,14 @@ final class PricingFixtures {
 
     static final double SPX = 5000;
     static final double VIX = 15;
+    static final LocalTime OPEN = LocalTime.of(9, 30);
     static final LocalTime TEN = LocalTime.of(10, 0);
     static final LocalTime NOON = LocalTime.of(12, 0);
     static final LocalTime CLOSE = LocalTime.of(16, 0);
 
-    static final TimeParams TIME = new TimeParams(CLOSE, 252, 390);
+    static final TimeParams TIME = new TimeParams(OPEN, CLOSE, 252, 390);
     static final BlackScholesParams BS = new BlackScholesParams(1.0, 0.0, 0.0);
+    static final BlackScholesParams SHIPPED_BS = new BlackScholesParams(0.85, 0.0, 0.0);
     static final EmpiricalParams EMPIRICAL = new EmpiricalParams(0.3, 3.8, 1.34, 138, 0.45, 0.8, 2.1,
             0.22, 240, 55, 0.22, 150, 45);
 

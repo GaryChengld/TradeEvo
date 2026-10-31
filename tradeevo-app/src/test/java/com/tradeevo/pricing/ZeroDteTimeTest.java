@@ -23,9 +23,14 @@ class ZeroDteTimeTest {
     }
 
     @Test
-    void capsTimeLeftAtTheSessionLengthBeforeTheOpen() {
+    void timesBeforeTheOpenPriceLikeTheOpen() {
         assertThat(time.minutesLeft(LocalTime.of(9, 0))).isEqualTo(390);
         assertThat(time.years(LocalTime.of(9, 0))).isEqualTo(time.years(LocalTime.of(9, 30)));
+
+        ZeroDteTime earlyClose = new ZeroDteTime(new TimeParams(PricingFixtures.OPEN, LocalTime.of(13, 0), 252, 390));
+        assertThat(earlyClose.minutesLeft(LocalTime.of(9, 30))).isEqualTo(210);
+        assertThat(earlyClose.minutesLeft(LocalTime.of(9, 0))).isEqualTo(210);
+        assertThat(earlyClose.minutesLeft(LocalTime.of(8, 0))).isEqualTo(210);
     }
 
     @Test
@@ -36,7 +41,7 @@ class ZeroDteTimeTest {
 
     @Test
     void honorsOtherSettings() {
-        ZeroDteTime earlyClose = new ZeroDteTime(new TimeParams(LocalTime.of(13, 0), 250, 400));
+        ZeroDteTime earlyClose = new ZeroDteTime(new TimeParams(PricingFixtures.OPEN, LocalTime.of(13, 0), 250, 400));
         assertThat(earlyClose.minutesLeft(LocalTime.of(12, 0))).isEqualTo(60);
         assertThat(earlyClose.minutesLeft(LocalTime.of(13, 0))).isEqualTo(0);
         assertThat(earlyClose.years(LocalTime.of(12, 0))).isCloseTo(60.0 / (250 * 400), within(1e-15));
@@ -44,8 +49,9 @@ class ZeroDteTimeTest {
 
     @Test
     void parameterRecordsRejectInvalidValues() {
-        assertThatThrownBy(() -> new TimeParams(null, 252, 390)).hasMessageStartingWith("expiration:");
-        assertThatThrownBy(() -> new TimeParams(LocalTime.NOON, 0, 390)).hasMessageStartingWith("tradingDaysPerYear:");
+        assertThatThrownBy(() -> new TimeParams(null, LocalTime.NOON, 252, 390)).hasMessageStartingWith("open:");
+        assertThatThrownBy(() -> new TimeParams(PricingFixtures.OPEN, null, 252, 390)).hasMessageStartingWith("expiration:");
+        assertThatThrownBy(() -> new TimeParams(PricingFixtures.OPEN, LocalTime.NOON, 0, 390)).hasMessageStartingWith("tradingDaysPerYear:");
         assertThatThrownBy(() -> new BlackScholesParams(0, 0, 0)).hasMessageStartingWith("ivMultiplier: must be > 0");
         assertThatThrownBy(() -> new BlackScholesParams(1, Double.NaN, 0)).hasMessageStartingWith("rate:");
         assertThatThrownBy(() -> new EmpiricalParams(0.3, 3.8, 1.34, 138, 0.45, 2.5, 2.1, 0.22, 240, 55, 0.22, 150, 45))

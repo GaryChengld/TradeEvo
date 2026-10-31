@@ -50,7 +50,7 @@ class PricingModelsTest {
 
         assertThat(models.defaultModel()).isEqualTo(PricingModels.BLACK_SCHOLES);
         assertThat(models.timeParams()).isEqualTo(PricingFixtures.TIME);
-        assertThat(models.blackScholesParams()).isEqualTo(PricingFixtures.BS);
+        assertThat(models.blackScholesParams()).isEqualTo(PricingFixtures.SHIPPED_BS);
         assertThat(models.empiricalParams()).isEqualTo(PricingFixtures.EMPIRICAL);
     }
 
@@ -87,6 +87,10 @@ class PricingModelsTest {
                 .containsExactly("models.empirical.mHeight: must be >= 0");
         assertThat(errorsAfter(r -> model(r, "empirical").put("aHeight", -2)))
                 .containsExactly("models.empirical.aHeight: must be >= 0");
+        assertThat(errorsAfter(r -> ((ObjectNode) r.get("time")).put("open", "930")))
+                .containsExactly("time.open: must be a time HH:mm");
+        assertThat(errorsAfter(r -> ((ObjectNode) r.get("time")).remove("open")))
+                .containsExactly("time.open: is required");
         assertThat(errorsAfter(r -> ((ObjectNode) r.get("time")).put("expiration", "4pm")))
                 .containsExactly("time.expiration: must be a time HH:mm");
         assertThat(errorsAfter(r -> ((ObjectNode) r.get("time")).put("expiration", "25:00")))

@@ -1,13 +1,14 @@
 {
   "defaultModel": "black-scholes",
   "time": {
+    "open": "09:30",
     "expiration": "16:00",
     "tradingDaysPerYear": 252,
     "sessionMinutes": 390
   },
   "models": {
     "black-scholes": {
-      "ivMultiplier": 1.0,
+      "ivMultiplier": 0.85,
       "rate": 0.0,
       "dividend": 0.0
     },

@@ -44,7 +44,8 @@ class SpreadPricersTest {
             ResolvedPricer resolved = pricers.create(pricing);
             assertThat(resolved.model()).isEqualTo("black-scholes");
             assertThat(resolved.pricer()).isInstanceOf(BlackScholesSpreadPricer.class);
-            assertThat(samplePrice(resolved.pricer())).isEqualTo(samplePrice(PricingFixtures.BS_SPREADS));
+            assertThat(samplePrice(resolved.pricer())).isEqualTo(
+                    samplePrice(new BlackScholesSpreadPricer(PricingFixtures.TIME, PricingFixtures.SHIPPED_BS)));
         }
     }
 
@@ -60,13 +61,13 @@ class SpreadPricersTest {
     void appliesOverridesAndReportsTheResolvedParameters() {
         ResolvedPricer resolved = pricers.create(json("{'overrides': {'ivMultiplier': 1.15, 'expiration': '13:00'}}"));
 
-        TimeParams earlyClose = new TimeParams(LocalTime.of(13, 0), 252, 390);
+        TimeParams earlyClose = new TimeParams(PricingFixtures.OPEN, LocalTime.of(13, 0), 252, 390);
         BlackScholesSpreadPricer expected = new BlackScholesSpreadPricer(earlyClose, new BlackScholesParams(1.15, 0, 0));
         assertThat(samplePrice(resolved.pricer())).isEqualTo(samplePrice(expected));
         assertThat(resolved.pricer().price(SPX, VIX, LocalTime.of(13, 0), BULL_PUT, 5004, 4994)).isEqualTo(4);
         assertThat(resolved.parameters()).isEqualTo(json("""
                 {'model': 'black-scholes',
-                 'time': {'expiration': '13:00', 'tradingDaysPerYear': 252, 'sessionMinutes': 390},
+                 'time': {'open': '09:30', 'expiration': '13:00', 'tradingDaysPerYear': 252, 'sessionMinutes': 390},
                  'params': {'ivMultiplier': 1.15, 'rate': 0.0, 'dividend': 0.0}}
                 """));
     }
@@ -117,12 +118,12 @@ class SpreadPricersTest {
 
     @Test
     void fileIsReadOnceAndCached() throws IOException {
-        assertThat(pricers.create(null).parameters().get("params").get("ivMultiplier").doubleValue()).isEqualTo(1.0);
+        assertThat(pricers.create(null).parameters().get("params").get("ivMultiplier").doubleValue()).isEqualTo(0.85);
 
-        Files.writeString(file, Files.readString(file).replace("\"ivMultiplier\": 1.0", "\"ivMultiplier\": 2.0"));
+        Files.writeString(file, Files.readString(file).replace("\"ivMultiplier\": 0.85", "\"ivMultiplier\": 2.0"));
         assertThat(Files.readString(file)).contains("\"ivMultiplier\": 2.0");
         assertThat(pricers.create(null).parameters().get("params").get("ivMultiplier").doubleValue())
-                .as("edit not seen until restart").isEqualTo(1.0);
+                .as("edit not seen until restart").isEqualTo(0.85);
         assertThat(new SpreadPricers(file, AppTestSupport.MAPPER).create(null).parameters().get("params")
                 .get("ivMultiplier").doubleValue()).as("a new instance reads the file again").isEqualTo(2.0);
 

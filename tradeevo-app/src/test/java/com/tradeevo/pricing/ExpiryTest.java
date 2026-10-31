@@ -69,7 +69,7 @@ class ExpiryTest {
 
     @Test
     void earlyCloseMovesExpiration() {
-        TimeParams earlyClose = new TimeParams(LocalTime.of(13, 0), 252, 390);
+        TimeParams earlyClose = new TimeParams(PricingFixtures.OPEN, LocalTime.of(13, 0), 252, 390);
         ZeroDteOptionPricer options = new ZeroDteOptionPricer(earlyClose, BS);
 
         assertThat(new ZeroDteTime(earlyClose).minutesLeft(LocalTime.NOON)).isEqualTo(60);

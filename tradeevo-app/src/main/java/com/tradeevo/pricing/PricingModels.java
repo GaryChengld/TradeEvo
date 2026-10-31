@@ -32,6 +32,7 @@ public final class PricingModels {
     public static final String EMPIRICAL = "empirical";
 
     private static final Map<String, ParamKind> TIME = schema(
+            "open", ParamKind.TIME_OF_DAY,
             "expiration", ParamKind.TIME_OF_DAY,
             "tradingDaysPerYear", ParamKind.POSITIVE_INTEGER,
             "sessionMinutes", ParamKind.POSITIVE_INTEGER);
@@ -246,7 +247,8 @@ public final class PricingModels {
     }
 
     private static TimeParams timeParams(ObjectNode node) {
-        return new TimeParams(LocalTime.parse(node.get("expiration").asText()),
+        return new TimeParams(LocalTime.parse(node.get("open").asText()),
+                LocalTime.parse(node.get("expiration").asText()),
                 node.get("tradingDaysPerYear").intValue(), node.get("sessionMinutes").intValue());
     }
 
