@@ -21,10 +21,10 @@ class ModelComparisonTest {
 
     /** N (expected moves out of the money), Black-Scholes price, empirical price. */
     private static final double[][] PINNED = {
-            {0, 2.348242617730648, 3.2392702335431456},
-            {0.5, 1.2648818383120215, 0.4844931761200479},
-            {1, 0.522482219850076, 0.07246497537506028},
-            {1.28, 0.28050919641660244, 0.02500568869682424}};
+            {0, 2.298442423732922, 3.2392702335431456},
+            {0.5, 0.9595623697620113, 0.4844931761200479},
+            {1, 0.25076431101979324, 0.07246497537506028},
+            {1.28, 0.0944511047224239, 0.02500568869682424}};
 
     @Test
     void pricesWithTheShippedParametersArePinned() {
@@ -46,7 +46,7 @@ class ModelComparisonTest {
     void documentsTheGapBetweenTheModels() {
         // At the strike the empirical model is richer; from 0.5 EM out it is much cheaper.
         assertThat(PINNED[0][2]).isGreaterThan(PINNED[0][1]);
-        assertThat(PINNED[2][1] / PINNED[2][2]).as("about 7x apart at N = 1").isBetween(6.0, 8.0);
-        assertThat(PINNED[3][1] / PINNED[3][2]).as("about 11x apart at N = 1.28").isBetween(10.0, 12.5);
+        assertThat(PINNED[2][1] / PINNED[2][2]).as("about 3.5x apart at N = 1").isBetween(3.0, 4.0);
+        assertThat(PINNED[3][1] / PINNED[3][2]).as("about 4x apart at N = 1.28").isBetween(3.5, 4.2);
     }
 }

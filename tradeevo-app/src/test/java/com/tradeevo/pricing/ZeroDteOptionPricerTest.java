@@ -38,7 +38,7 @@ class ZeroDteOptionPricerTest {
 
     @Test
     void ivMultiplierScalesVix() {
-        ZeroDteOptionPricer unit = new ZeroDteOptionPricer(TIME, new BlackScholesParams(1.0, 0, 0));
+        ZeroDteOptionPricer unit = new ZeroDteOptionPricer(TIME, new BlackScholesParams(1.0, 0, 0, 0));
         double sigma = VIX / 100;
         double years = new ZeroDteTime(TIME).years(TEN);
         assertThat(unit.price(SPX, 5010, VIX, TEN, CALL))
@@ -46,12 +46,34 @@ class ZeroDteOptionPricerTest {
 
         double previous = 0;
         for (double k : new double[] {0.5, 1.0, 1.15, 2.0}) {
-            ZeroDteOptionPricer scaled = new ZeroDteOptionPricer(TIME, new BlackScholesParams(k, 0, 0));
+            ZeroDteOptionPricer scaled = new ZeroDteOptionPricer(TIME, new BlackScholesParams(k, 0, 0, 0));
             double price = scaled.price(SPX, 5010, VIX, TEN, CALL);
             assertThat(price).as("k=%s", k).isCloseTo(unit.price(SPX, 5010, VIX * k, TEN, CALL), within(1e-9));
             assertThat(price).isGreaterThan(previous);
             previous = price;
         }
+    }
+
+    @Test
+    void skewRaisesVolatilityWithDistanceFromSpot() {
+        ZeroDteOptionPricer skewed = new ZeroDteOptionPricer(TIME, new BlackScholesParams(0.59, 0.21, 0, 0));
+        // 1% from spot on either side: sigma = VIX / 100 * 0.59 * (1 + 0.21 * 1)
+        ZeroDteOptionPricer flatOnePercent = new ZeroDteOptionPricer(TIME, new BlackScholesParams(0.59 * 1.21, 0, 0, 0));
+        assertThat(skewed.price(SPX, 4950, VIX, TEN, PUT))
+                .isCloseTo(flatOnePercent.price(SPX, 4950, VIX, TEN, PUT), within(1e-12));
+        assertThat(skewed.price(SPX, 5050, VIX, TEN, CALL))
+                .isCloseTo(flatOnePercent.price(SPX, 5050, VIX, TEN, CALL), within(1e-12));
+
+        ZeroDteOptionPricer flat = new ZeroDteOptionPricer(TIME, new BlackScholesParams(0.59, 0, 0, 0));
+        assertThat(skewed.price(SPX, SPX, VIX, TEN, PUT)).as("no skew at the money")
+                .isEqualTo(flat.price(SPX, SPX, VIX, TEN, PUT));
+        assertThat(skewed.price(SPX, 4950, VIX, TEN, PUT)).isGreaterThan(flat.price(SPX, 4950, VIX, TEN, PUT));
+    }
+
+    @Test
+    void zeroSkewLeavesVolatilityFlat() {
+        assertThat(OPTIONS.price(SPX, 4900, VIX, TEN, PUT))
+                .isEqualTo(BlackScholes.price(SPX, 4900, VIX / 100, new ZeroDteTime(TIME).years(TEN), 0, 0, PUT));
     }
 
     @Test

@@ -60,6 +60,10 @@ class PricingModelsTest {
                 .containsExactly("defaultModel: must be one of [black-scholes, empirical]");
         assertThat(errorsAfter(r -> model(r, "black-scholes").put("ivMultiplier", 0)))
                 .containsExactly("models.black-scholes.ivMultiplier: must be > 0");
+        assertThat(errorsAfter(r -> model(r, "black-scholes").put("skew", -0.21)))
+                .containsExactly("models.black-scholes.skew: must be >= 0");
+        assertThat(errorsAfter(r -> model(r, "black-scholes").remove("skew")))
+                .containsExactly("models.black-scholes.skew: is required");
         assertThat(errorsAfter(r -> model(r, "empirical").remove("decay")))
                 .containsExactly("models.empirical.decay: is required");
         assertThat(errorsAfter(r -> r.put("extra", 1))).containsExactly("extra: unknown property");

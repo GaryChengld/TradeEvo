@@ -27,10 +27,12 @@ EM          = SPX × σ × √years                    (expected move, in index 
 Black-Scholes prices with an adjustable effective volatility:
 
 ```
-σ_effective = VIX / 100 × ivMultiplier
+σ_effective = VIX / 100 × ivMultiplier × (1 + skew × |K / SPX − 1| × 100)
 ```
 
-`ivMultiplier` is a Black-Scholes parameter (shipped value 0.85). It calibrates for the gap between VIX, which is 30-day implied volatility, and the volatility the market prices into same-day options, and it offsets the overnight share described below. 0.85 is a starting estimate that has not been calibrated against real quotes. EM and N always use the raw σ, because the empirical model was calibrated on raw VIX.
+`ivMultiplier` and `skew` are Black-Scholes parameters (shipped values 0.65 and 0). `ivMultiplier` calibrates for the gap between VIX, which is 30-day implied volatility, and the volatility the market prices into same-day options, and it offsets the overnight share described below. `skew` raises a strike's volatility by that fraction of the base for every percent the strike is away from spot, on either side; 0 keeps volatility flat. EM and N always use the raw σ, because the empirical model was calibrated on raw VIX.
+
+Calibration (`research/spx-0dte-quotes/summary-5days.md` on branch `claude/project-thread-l1vb1z`): five days of CBOE delayed SPXW quotes, 2026-11-02 to 11-06, 5,418 option quotes, fitted with leave-one-day-out validation. The best fixed multiplier was 0.65 (single days 0.45–0.82). The only model that beat it out of sample was `ivMultiplier` 0.59 with `skew` 0.21, which a strategy can turn on through overrides. Separate multipliers for five times of day did worse and are not supported. These values come from five days and are to be refitted on about 15 days after 2026-11-20.
 
 `open`, `expiration`, `tradingDaysPerYear` and `sessionMinutes` come from the parameters file (shipped values: 09:30, 16:00, 252, 390). On early-close days the strategy overrides `expiration` (e.g. 13:00), and each minute keeps the same variance; `sessionMinutes` stays 390 because it sets the length of the year, not the length of that day. A time before `open` prices like the open. `now` is a `LocalTime` in exchange time. Seconds count, as fractional minutes.
 
@@ -53,7 +55,8 @@ Known simplifications, documented in the Javadoc:
   },
   "models": {
     "black-scholes": {
-      "ivMultiplier": 0.85,
+      "ivMultiplier": 0.65,
+      "skew": 0.0,
       "rate": 0.0,
       "dividend": 0.0
     },
@@ -77,6 +80,7 @@ Rules:
   - `tradingDaysPerYear` and `sessionMinutes` must be positive integers.
   - `defaultModel` must name a model in `models`.
   - `ivMultiplier`, `decay`, `cPivot`, `mWidth` and `aWidth` must be > 0.
+  - `skew` must be ≥ 0.
   - `base`, `cScale`, `cMin`, `mHeight` and `aHeight` must be ≥ 0, so no empirical factor can go negative.
   - `cMin` ≤ `cMax`.
 - **Errors are reported together,** each with its JSON path, e.g. `models.empirical.decay: must be > 0`.
@@ -98,6 +102,7 @@ A strategy reads an optional `pricing` block from its `settings`. It chooses the
 
 - `model` is `"black-scholes"` or `"empirical"`. When it is left out, or the whole `pricing` block is absent, the file's `defaultModel` is used (shipped: `black-scholes`).
 - Example: `"pricing": {"overrides": {"ivMultiplier": 1.15}}` uses Black-Scholes with 15% more volatility than VIX implies.
+- Example: `"pricing": {"overrides": {"ivMultiplier": 0.59, "skew": 0.21}}` uses the skewed fit from the real-quote calibration.
 - An override can set a `time` parameter or a parameter of the chosen model. The validation rules for the file apply to overrides too.
 - Override errors are reported with the strategy path, e.g. `settings.pricing.overrides.decay: must be > 0`, in the same style as `Strategy.validate`, so a strategy can add them to its own errors.
 
@@ -112,16 +117,16 @@ Prices now depend on a file outside the strategy config and data, so the run's e
 | `OptionType` | `CALL`, `PUT` |
 | `SpreadDirection` | `BULL_PUT` (short put spread, long strike < short strike), `BEAR_CALL` (short call spread, long strike > short strike) |
 | `TimeParams` (record) | `open`, `expiration`, `tradingDaysPerYear`, `sessionMinutes` |
-| `BlackScholesParams` (record) | `ivMultiplier`, `rate`, `dividend` |
+| `BlackScholesParams` (record) | `ivMultiplier`, `skew`, `rate`, `dividend` |
 | `EmpiricalParams` (record) | the 13 empirical parameters |
 | `PricingModels` | loads and validates the file into those records, applies overrides and returns errors; it has no defaults of its own |
 | `ZeroDteTime` | built from `TimeParams`; `minutesLeft(now)` and `years(now)` |
 | `ExpectedMove` | `points(spx, vix, years)` gives EM; `distance(spx, shortStrike, direction, em)` gives N = D / EM |
 | `NormalDistribution` | `cdf(x)` with Hart's double-precision algorithm (West 2005), absolute error ≈ 1e-15 |
 | `BlackScholes` | `price(spot, strike, sigma, years, rate, dividend, type)`: European; when `years ≤ 0` or `sigma = 0`, returns the intrinsic value |
-| `ZeroDteOptionPricer` | built from `TimeParams` and `BlackScholesParams`; `price(spx, strike, vix, now, type)` uses σ_effective = VIX/100 × ivMultiplier |
+| `ZeroDteOptionPricer` | built from `TimeParams` and `BlackScholesParams`; `price(spx, strike, vix, now, type)` uses σ_effective for that strike |
 | `SpreadPricer` (interface) | `price(spx, vix, now, direction, shortStrike, longStrike)`: the spread's value to close, in `[0, width]` |
-| `BlackScholesSpreadPricer` | built from `TimeParams` and `BlackScholesParams`; short leg minus long leg via `BlackScholes` at σ_effective, clamped to `[0, width]` |
+| `BlackScholesSpreadPricer` | built from `TimeParams` and `BlackScholesParams`; short leg minus long leg via `ZeroDteOptionPricer`, each leg at its own σ_effective, clamped to `[0, width]` |
 | `EmpiricalSpreadPricer` | built from `TimeParams` and `EmpiricalParams`; the calibrated formula below |
 | `SpreadPricers` | Spring bean in `TradeEvoConfiguration`. It loads the file lazily via `PricingModels`. `validate(JsonNode pricing, String path)` returns error strings. `create(JsonNode pricing)` returns a `ResolvedPricer(SpreadPricer pricer, JsonNode parameters)` |
 
@@ -149,7 +154,7 @@ Pricing rules:
 - **N ≥ 0 (out of the money):** returns f(N), identical to the original function.
 - **N < 0 (in the money):** returns max(intrinsic, width − (width − f₀) × exp(−decay × |N|)), where f₀ = f(0). (The original returned the intrinsic value, which dropped by about 0.65 × width at the strike.) This is continuous at the strike, approaches the width deep in the money, and never falls below intrinsic.
 
-With the shipped parameters, the out-of-the-money values are much lower than Black-Scholes beyond about 0.3 EM. For example, at 12:00 and N = 1 this model gives 0.015 × width, against about 0.10 for Black-Scholes. Comparing backtest runs that use the two models is how to judge them.
+With the shipped parameters, the out-of-the-money values are much lower than Black-Scholes beyond about 0.3 EM. For example, at 12:00 and N = 1 this model gives 0.015 × width, against about 0.05 for Black-Scholes. Comparing backtest runs that use the two models is how to judge them.
 
 A price that is not finite, which only extreme parameters can produce, throws `IllegalArgumentException`.
 
@@ -183,7 +188,9 @@ Tests use one shared helper, `assertWithinTolerance(actual, reference)`, so the 
 
 The ±20% band never applies to identities or bounds. A put-call parity break or a spread priced above its width is a bug, not an estimation error.
 
-Out of scope here: a 20% gap between the two models is not a failure. At N = 1 they differ by about 7×, which the comparison test only records. Judging which model meets ±20% against real fills is a calibration task that needs real quotes.
+Out of scope here: a 20% gap between the two models is not a failure. At N = 1 they differ by about 3.5×, which the comparison test only records.
+
+Against real quotes, VIX alone does not reach ±20%. Out of sample, the best Black-Scholes setting put only about 20% of option prices and 32% of spread prices within ±20%. The main cause is that the ratio of 0DTE at-the-money IV to VIX changes from day to day: about 1× on normal days, but 2–2.5× on the 2026-11-05 selloff. With a fixed multiplier, the model prices spreads near the money too high and far out of the money too low, and it understates how much a spread gains on a big down day. Backtest reports should say so, and stop-loss rules need room for it. The empirical model was not checked against these quotes.
 
 - **`NormalDistribution`:** reference values at 0, ±1, ±1.96 and ±5, and symmetry.
 - **`BlackScholes`:**

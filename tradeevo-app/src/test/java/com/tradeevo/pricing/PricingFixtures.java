@@ -25,8 +25,8 @@ final class PricingFixtures {
     static final LocalTime CLOSE = LocalTime.of(16, 0);
 
     static final TimeParams TIME = new TimeParams(OPEN, CLOSE, 252, 390);
-    static final BlackScholesParams BS = new BlackScholesParams(1.0, 0.0, 0.0);
-    static final BlackScholesParams SHIPPED_BS = new BlackScholesParams(0.85, 0.0, 0.0);
+    static final BlackScholesParams BS = new BlackScholesParams(1.0, 0.0, 0.0, 0.0);
+    static final BlackScholesParams SHIPPED_BS = new BlackScholesParams(0.65, 0.0, 0.0, 0.0);
     static final EmpiricalParams EMPIRICAL = new EmpiricalParams(0.3, 3.8, 1.34, 138, 0.45, 0.8, 2.1,
             0.22, 240, 55, 0.22, 150, 45);
 

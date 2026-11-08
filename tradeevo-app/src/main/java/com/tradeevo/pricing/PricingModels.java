@@ -40,6 +40,7 @@ public final class PricingModels {
     private static final Map<String, Map<String, ParamKind>> MODELS = Map.of(
             BLACK_SCHOLES, schema(
                     "ivMultiplier", ParamKind.POSITIVE,
+                    "skew", ParamKind.NON_NEGATIVE,
                     "rate", ParamKind.FINITE,
                     "dividend", ParamKind.FINITE),
             EMPIRICAL, schema(
@@ -253,7 +254,7 @@ public final class PricingModels {
     }
 
     private static BlackScholesParams blackScholesParams(ObjectNode node) {
-        return new BlackScholesParams(d(node, "ivMultiplier"), d(node, "rate"), d(node, "dividend"));
+        return new BlackScholesParams(d(node, "ivMultiplier"), d(node, "skew"), d(node, "rate"), d(node, "dividend"));
     }
 
     private static EmpiricalParams empiricalParams(ObjectNode node) {

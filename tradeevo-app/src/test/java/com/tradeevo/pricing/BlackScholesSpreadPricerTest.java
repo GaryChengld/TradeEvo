@@ -29,6 +29,20 @@ class BlackScholesSpreadPricerTest {
     }
 
     @Test
+    void withSkewEachLegUsesItsOwnVolatility() {
+        BlackScholesParams skewed = new BlackScholesParams(0.59, 0.21, 0, 0);
+        double shortPut = new ZeroDteOptionPricer(PricingFixtures.TIME, skewed).price(SPX, 4950, VIX, TEN, OptionType.PUT);
+        double longPut = new ZeroDteOptionPricer(PricingFixtures.TIME, skewed).price(SPX, 4900, VIX, TEN, OptionType.PUT);
+        double price = new BlackScholesSpreadPricer(PricingFixtures.TIME, skewed).price(SPX, VIX, TEN, BULL_PUT, 4950, 4900);
+        assertThat(price).isEqualTo(shortPut - longPut);
+
+        // The long leg is 2% out, so it gets more volatility than a flat 1%-skew model would give it.
+        BlackScholesParams flatAtShortLeg = new BlackScholesParams(0.59 * 1.21, 0, 0, 0);
+        assertThat(price).isLessThan(
+                new BlackScholesSpreadPricer(PricingFixtures.TIME, flatAtShortLeg).price(SPX, VIX, TEN, BULL_PUT, 4950, 4900));
+    }
+
+    @Test
     void atExpiryReturnsIntrinsic() {
         assertThat(BS_SPREADS.price(SPX, VIX, CLOSE, BULL_PUT, 4990, 4980)).isEqualTo(0);
         assertThat(BS_SPREADS.price(SPX, VIX, CLOSE, BULL_PUT, 5004, 4994)).isEqualTo(4);

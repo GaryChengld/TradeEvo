@@ -62,14 +62,28 @@ class SpreadPricersTest {
         ResolvedPricer resolved = pricers.create(json("{'overrides': {'ivMultiplier': 1.15, 'expiration': '13:00'}}"));
 
         TimeParams earlyClose = new TimeParams(PricingFixtures.OPEN, LocalTime.of(13, 0), 252, 390);
-        BlackScholesSpreadPricer expected = new BlackScholesSpreadPricer(earlyClose, new BlackScholesParams(1.15, 0, 0));
+        BlackScholesSpreadPricer expected = new BlackScholesSpreadPricer(earlyClose, new BlackScholesParams(1.15, 0, 0, 0));
         assertThat(samplePrice(resolved.pricer())).isEqualTo(samplePrice(expected));
         assertThat(resolved.pricer().price(SPX, VIX, LocalTime.of(13, 0), BULL_PUT, 5004, 4994)).isEqualTo(4);
         assertThat(resolved.parameters()).isEqualTo(json("""
                 {'model': 'black-scholes',
                  'time': {'open': '09:30', 'expiration': '13:00', 'tradingDaysPerYear': 252, 'sessionMinutes': 390},
-                 'params': {'ivMultiplier': 1.15, 'rate': 0.0, 'dividend': 0.0}}
+                 'params': {'ivMultiplier': 1.15, 'skew': 0.0, 'rate': 0.0, 'dividend': 0.0}}
                 """));
+    }
+
+    @Test
+    void skewCanBeTurnedOnPerStrategy() {
+        ResolvedPricer resolved = pricers.create(json("{'overrides': {'ivMultiplier': 0.59, 'skew': 0.21}}"));
+
+        BlackScholesSpreadPricer expected = new BlackScholesSpreadPricer(PricingFixtures.TIME,
+                new BlackScholesParams(0.59, 0.21, 0, 0));
+        assertThat(resolved.pricer().price(SPX, VIX, LocalTime.of(12, 0), BULL_PUT, 4950, 4940))
+                .isEqualTo(expected.price(SPX, VIX, LocalTime.of(12, 0), BULL_PUT, 4950, 4940));
+        assertThat(resolved.parameters().get("params").get("skew").doubleValue()).isEqualTo(0.21);
+        assertThatThrownBy(() -> pricers.create(json("{'overrides': {'skew': -1}}")))
+                .isInstanceOfSatisfying(InvalidConfigException.class, e -> assertThat(e.getErrors())
+                        .containsExactly("settings.pricing.overrides.skew: must be >= 0"));
     }
 
     @Test
@@ -118,12 +132,12 @@ class SpreadPricersTest {
 
     @Test
     void fileIsReadOnceAndCached() throws IOException {
-        assertThat(pricers.create(null).parameters().get("params").get("ivMultiplier").doubleValue()).isEqualTo(0.85);
+        assertThat(pricers.create(null).parameters().get("params").get("ivMultiplier").doubleValue()).isEqualTo(0.65);
 
-        Files.writeString(file, Files.readString(file).replace("\"ivMultiplier\": 0.85", "\"ivMultiplier\": 2.0"));
+        Files.writeString(file, Files.readString(file).replace("\"ivMultiplier\": 0.65", "\"ivMultiplier\": 2.0"));
         assertThat(Files.readString(file)).contains("\"ivMultiplier\": 2.0");
         assertThat(pricers.create(null).parameters().get("params").get("ivMultiplier").doubleValue())
-                .as("edit not seen until restart").isEqualTo(0.85);
+                .as("edit not seen until restart").isEqualTo(0.65);
         assertThat(new SpreadPricers(file, AppTestSupport.MAPPER).create(null).parameters().get("params")
                 .get("ivMultiplier").doubleValue()).as("a new instance reads the file again").isEqualTo(2.0);
 

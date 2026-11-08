@@ -52,8 +52,9 @@ class ZeroDteTimeTest {
         assertThatThrownBy(() -> new TimeParams(null, LocalTime.NOON, 252, 390)).hasMessageStartingWith("open:");
         assertThatThrownBy(() -> new TimeParams(PricingFixtures.OPEN, null, 252, 390)).hasMessageStartingWith("expiration:");
         assertThatThrownBy(() -> new TimeParams(PricingFixtures.OPEN, LocalTime.NOON, 0, 390)).hasMessageStartingWith("tradingDaysPerYear:");
-        assertThatThrownBy(() -> new BlackScholesParams(0, 0, 0)).hasMessageStartingWith("ivMultiplier: must be > 0");
-        assertThatThrownBy(() -> new BlackScholesParams(1, Double.NaN, 0)).hasMessageStartingWith("rate:");
+        assertThatThrownBy(() -> new BlackScholesParams(0, 0, 0, 0)).hasMessageStartingWith("ivMultiplier: must be > 0");
+        assertThatThrownBy(() -> new BlackScholesParams(1, 0, Double.NaN, 0)).hasMessageStartingWith("rate:");
+        assertThatThrownBy(() -> new BlackScholesParams(1, -0.1, 0, 0)).hasMessageStartingWith("skew: must be >= 0");
         assertThatThrownBy(() -> new EmpiricalParams(0.3, 3.8, 1.34, 138, 0.45, 2.5, 2.1, 0.22, 240, 55, 0.22, 150, 45))
                 .hasMessageStartingWith("cMin: must be <= cMax");
         assertThatThrownBy(() -> new EmpiricalParams(0.3, 0, 1.34, 138, 0.45, 0.8, 2.1, 0.22, 240, 55, 0.22, 150, 45))
